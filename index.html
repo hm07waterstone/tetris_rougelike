@@ -117,7 +117,9 @@ canvas{display:block;image-rendering:pixelated}
     </div>
     <div class="about-card">
       <h3>🧊 Special Cell Types</h3>
-      <p><strong style="color:#b0eeff">Frost Cells</strong> — Left by frost pieces (Frost Bag mod). Icy blue. They resist a line clear: the first clear <em>cracks</em> them (darker, visibly fractured) and nulls the rest of the row, but doesn't remove the row. Fill the row again and clear it a second time to break them for good.</p>
+      <p><strong style="color:#e8f8ff">Hard-Frost Cells</strong> — From Frost Bag+. Near-white ice. Need 3 clears: first crack demotes to regular frost (vivid blue), second crack darkens to cracked frost (deep blue), third clear removes them.</p>
+      <p><strong style="color:#7ad4f0">Frost Cells</strong> — From Frost Bag. Vivid ice blue. Need 2 clears: first clear cracks them (deep steel blue), second clear removes them.</p>
+      <p><strong style="color:#2e6e99">Cracked Frost</strong> — Any frost cell that has been cracked once. Deep steel blue with visible fracture lines. One more clear removes it.</p>
       <p><strong style="color:#e44">Wound Lines</strong> — Inserted by Déjà Vu when you repeat the same clear type. Each wound row has a countdown (shown on the leftmost cell). It ticks down by lines cleared each turn; when it hits 0 the row erases itself entirely. They cannot be line-cleared directly.</p>
       <p><strong style="color:#555">Permanent Lines</strong> — Unbreakable grey rows added by Bedrock and post-win Continue. They sit at the very bottom, forever.</p>
     </div>
@@ -145,8 +147,9 @@ canvas{display:block;image-rendering:pixelated}
         <div class="about-mod mod-yellow"><strong>Thin Bag</strong> — 1 type removed per bag, ×1.5</div>
         <div class="about-mod mod-orange"><strong>Thin Bag+</strong> — 3 removed, +1 back, ×2.5</div>
         <div class="about-mod mod-yellow"><strong>Mirror</strong> — 180° key flips piece instead, ×1.5</div>
-        <div class="about-mod mod-yellow"><strong>Frost Bag</strong> — 1 piece/bag has one frost mino; needs 2 clears</div>
-        <div class="about-mod mod-orange"><strong>Frost Bag+</strong> — Full frost piece per bag; all cells need 2 clears</div>
+        <div class="about-mod mod-yellow"><strong>Frost Bag</strong> — ~Half the pieces per bag are fully frozen (2 clears each)</div>
+        <div class="about-mod mod-orange"><strong>Frost Bag+</strong> — Half frozen as before; half of those are hard-frozen (3 clears)</div>
+        <div class="about-mod mod-yellow"><strong>Trash Bag</strong> — 1 mino per bag is trash (brown). Clearing it injects a garbage line with holes at trash columns</div>
         <div class="about-mod mod-yellow"><strong>Tetraple</strong> — Triples → B2B (800pts); Tetrises → non-B2B (500pts)</div>
         <div class="about-mod mod-yellow"><strong>T-Tetramino</strong> — All I-pieces become T-pieces (incl. current bag), ×1.5</div>
         <div class="about-mod mod-yellow"><strong>BTB Chain</strong> — B2B stack (cap 25) scales BTB bonus: ×1.25…×2.50</div>
@@ -432,12 +435,12 @@ const ALL_MODS=[
   {id:'mirror',name:'Mirror',cls:'mod-yellow',
    desc:'The 180° rotation key now flips the piece horizontally instead. Score ×1.5.',
    apply(){mirrorActive=true;scoreMult*=1.5;}},
-  {id:'frostbag_mini',name:'Frost Bag',cls:'mod-yellow',upgrades:['frostbag'],
-   desc:'One piece per bag has a single random mino replaced with a frost cell. That one cell needs two line clears to remove; the rest of the piece is normal.',
-   apply(){frostBagMiniActive=true;}},
-  {id:'frostbag',name:'Frost Bag+',cls:'mod-orange',upgradeOf:'frostbag_mini',
-   desc:'The entire extra frost piece added per bag is icy. All its cells need two line clears to remove.',
-   apply(){frostBagMiniActive=false;frostBagActive=true;}},
+  {id:'frostbag',name:'Frost Bag',cls:'mod-yellow',upgrades:['frostbag_plus'],
+   desc:'~Half the pieces each bag (3–4 of 7) are fully frozen. All their cells need two line clears to remove. Frost cells glow brighter the more clears they still need.',
+   apply(){frostBagActive=true;}},
+  {id:'frostbag_plus',name:'Frost Bag+',cls:'mod-orange',upgradeOf:'frostbag',
+   desc:'Same as Frost Bag, but half of the frozen pieces are hard-frozen instead — needing three clears to remove (hard-frost → frost → cracked → gone).',
+   apply(){frostBagActive=true;frostBagHardActive=true;}},
   {id:'tetraple',name:'Tetraple',cls:'mod-yellow',
    desc:'Swaps Tetris and Triple behaviour: Triples maintain B2B and score 800pts (like a Tetris); Tetrises break B2B and score 500pts (like a Triple). T-spin triples are unaffected.',
    apply(){tetrapleActive=true;}},
@@ -458,6 +461,9 @@ const ALL_MODS=[
   {id:'flowmeter',name:'Flow Meter',cls:'mod-yellow',
    desc:'Tracks a flow meter (−5 to +15 display range). Qualifying clears (Tetris/T-spin/All-spin/PC) give +1 flow; non-qualifying clears (single/double/triple without spin) give −1. When flow exceeds +15, drain 1 and award 500 pts each tick. When flow drops below −5, inject a wound row of value 15.',
    apply(){flowMeterActive=true;}},
+  {id:'trashbag',name:'Trash Bag',cls:'mod-yellow',
+   desc:'One random mino per bag is a Trash cell (brown). When a line containing trash cells is cleared, a garbage line is added at the bottom — solid except for holes exactly where the trash minos were.',
+   apply(){trashBagActive=true;}},
 ];
 
 // ── STATE ─────────────────────────────────────────────────────────────────────
@@ -475,9 +481,10 @@ let blackoutActive,blackoutTimer,blackoutVisible,blackoutDelay;
 let earthquakeActive,minimalistActive,minimalistMono,oSpinMetaActive;
 let thinBagRemove,thinBagAddBack,thinBagExcluded;
 let mirrorActive; // flip mod
-let frostBagMiniActive,frostBagActive,tetrapleActive,tTetrominoActive; // new mods
+let frostBagActive,frostBagHardActive,tetrapleActive,tTetrominoActive; // frost/piece mods
 let btbChainActive,btbChainPlus,btbChainStack; // BTB Chain mod
 let flowMeterActive,flowMeter; // Flow Meter mod
+let trashBagActive; // Trash Bag mod
 let softDropHeld=false,lastRotated=false;
 let eqIndicator=null,hasWon=false,winPending=false;
 
@@ -511,13 +518,17 @@ function dejaColor(n,maxN){
   const t=hi.v===lo.v?1:(cv-lo.v)/(hi.v-lo.v);
   return `rgb(${~~(lo.r+(hi.r-lo.r)*t)},${~~(lo.g+(hi.g-lo.g)*t)},${~~(lo.b+(hi.b-lo.b)*t)})`;
 }
-function isFrostCell(v){return v&&typeof v==='string'&&v.startsWith('FROST_')&&!v.startsWith('FROST_CRACKED_');}
+function isFrostCell(v){return v&&typeof v==='string'&&v.startsWith('FROST_')&&!v.startsWith('FROST_CRACKED_')&&!v.startsWith('FROST_HARD_');}
+function isFrostHard(v){return v&&typeof v==='string'&&v.startsWith('FROST_HARD_');}
 function isFrostCracked(v){return v&&typeof v==='string'&&v.startsWith('FROST_CRACKED_');}
 function frostBaseType(v){
+  if(isFrostHard(v))return v.slice(11);
   if(isFrostCell(v))return v.slice(6);
   if(isFrostCracked(v))return v.slice(14);
   return null;
 }
+function isTrashCell(v){return v&&typeof v==='string'&&v.startsWith('TRASH_')&&v!=='TRASH_GARBAGE';}
+function trashBaseType(v){return isTrashCell(v)?v.slice(6):null;}
 // FROSTMINO pieces: a normal piece where one random mino index is frost
 // Token format: "FROSTMINO_T_2" = T-piece, mino index 2 is the frost cell
 function isFrostMinoPiece(type){return typeof type==='string'&&type.startsWith('FROSTMINO_');}
@@ -534,6 +545,32 @@ function makeFrostMinoToken(baseType){
   const [fr,fc]=cells[~~(Math.random()*cells.length)];
   return`FROSTMINO_${baseType}_${fr}_${fc}`;
 }
+// FROSTHARD mino pieces: like FROSTMINO but the cell starts at hard-frost (3 clears)
+function isFrostHardMinoPiece(type){return typeof type==='string'&&type.startsWith('FROSTHARD_')&&type.split('_').length===4;}
+function parseFrostHardMino(type){
+  const parts=type.slice(10).split('_');
+  return{baseType:parts[0],frostR:parseInt(parts[1]),frostC:parseInt(parts[2])};
+}
+function makeFrostHardMinoToken(baseType){
+  const shape=PIECES[baseType].shape;
+  const cells=[];
+  shape.forEach((row,r)=>row.forEach((c,col)=>{if(c)cells.push([r,col]);}));
+  const [fr,fc]=cells[~~(Math.random()*cells.length)];
+  return`FROSTHARD_${baseType}_${fr}_${fc}`;
+}
+// TRASHMINO pieces: a normal piece where one random mino is a trash cell
+function isTrashMinoPiece(type){return typeof type==='string'&&type.startsWith('TRASHMINO_');}
+function parseTrashMino(type){
+  const parts=type.slice(10).split('_');
+  return{baseType:parts[0],trashR:parseInt(parts[1]),trashC:parseInt(parts[2])};
+}
+function makeTrashMinoToken(baseType){
+  const shape=PIECES[baseType].shape;
+  const cells=[];
+  shape.forEach((row,r)=>row.forEach((c,col)=>{if(c)cells.push([r,col]);}));
+  const [tr,tc]=cells[~~(Math.random()*cells.length)];
+  return`TRASHMINO_${baseType}_${tr}_${tc}`;
+}
 function cellColor(v){
   if(!v)return null;
   if(v==='PERM')return '#444';
@@ -541,8 +578,11 @@ function cellColor(v){
     const n=dejaLinesLeft(v);
     return dejaColor(n,Math.max(25,n));
   }
-  if(isFrostCell(v)) return '#b0eeff'; // solid ice blue
-  if(isFrostCracked(v)) return '#5588aa'; // darker cracked ice
+  if(isFrostHard(v))  return blindfoldedMono?'#aabbcc':'#e8f8ff'; // 3 clears left — near-white ice
+  if(isFrostCell(v))  return blindfoldedMono?'#6699aa':'#7ad4f0'; // 2 clears left — vivid ice blue
+  if(isFrostCracked(v)) return blindfoldedMono?'#336688':'#2e6e99'; // 1 clear left — deep steel blue
+  if(isTrashCell(v))  return blindfoldedMono?'#887766':'#8B5E3C'; // brown, distinct in mono
+  if(v==='TRASH_GARBAGE') return blindfoldedMono?'#665544':'#6b4423'; // darker brown garbage
   if(blindfoldedMono)return '#666';
   return PIECE_COLORS[v]||'#888';
 }
@@ -590,9 +630,25 @@ function isFrostMinoCell(sy,sx){
   const shape0=PIECES[cur.baseType].shape;
   const N=shape0.length;
   let r=cur.frostMinoR,c=cur.frostMinoC;
-  // Step 1: flip horizontally if active (mirrors columns within each row)
   if(curFlipped){c=(shape0[0].length-1)-c;}
-  // Step 2: apply curRot clockwise quarter-turns: (r,c) → (c, N-1-r)
+  for(let i=0;i<curRot;i++){const nr=c,nc=N-1-r;r=nr;c=nc;}
+  return sy===r&&sx===c;
+}
+function isFrostHardMinoCell(sy,sx){
+  if(!cur.isFrostHardMino||cur.frostHardMinoR<0)return false;
+  const shape0=PIECES[cur.baseType].shape;
+  const N=shape0.length;
+  let r=cur.frostHardMinoR,c=cur.frostHardMinoC;
+  if(curFlipped){c=(shape0[0].length-1)-c;}
+  for(let i=0;i<curRot;i++){const nr=c,nc=N-1-r;r=nr;c=nc;}
+  return sy===r&&sx===c;
+}
+function isTrashMinoCell(sy,sx){
+  if(!cur.isTrashMino||cur.trashMinoR<0)return false;
+  const shape0=PIECES[cur.baseType].shape;
+  const N=shape0.length;
+  let r=cur.trashMinoR,c=cur.trashMinoC;
+  if(curFlipped){c=(shape0[0].length-1)-c;}
   for(let i=0;i<curRot;i++){const nr=c,nc=N-1-r;r=nr;c=nc;}
   return sy===r&&sx===c;
 }
@@ -755,19 +811,26 @@ function getBag(){
     if(thinBagAddBack)t.push(NON_O_TYPES[~~(Math.random()*NON_O_TYPES.length)]);
     randomiseThinBag();
   }
-  // Frost Bag (mini): one random piece in the bag gets one random frost mino
-  if(frostBagMiniActive){
-    const base=['I','O','T','S','Z','J','L'];
-    const bt=base[~~(Math.random()*base.length)];
-    // Replace a random slot in t with a frostmino token for that type
-    const replaceIdx=~~(Math.random()*t.length);
-    t[replaceIdx]=makeFrostMinoToken(bt);
-  }
-  // Frost Bag+ (full piece frost)
+  // Frost Bag: ~half the pieces per bag (3–4 of 7) become fully frozen (all cells, 2-clear)
   if(frostBagActive){
-    const base=['I','O','T','S','Z','J','L'];
-    const ft=base[~~(Math.random()*base.length)];
-    t.push('FROST_'+ft);
+    // Collect all plain single-letter slots, shuffle, take 3 or 4
+    const eligible=t.map((v,i)=>i).filter(i=>typeof t[i]==='string'&&t[i].length===1);
+    for(let i=eligible.length-1;i>0;i--){const j=~~(Math.random()*(i+1));[eligible[i],eligible[j]]=[eligible[j],eligible[i]];}
+    const count=Math.min(3+~~(Math.random()*2),eligible.length);
+    const chosen=eligible.slice(0,count);
+    // Frost Bag+: first half of chosen become hard-frost, rest become regular frost
+    const hardCount=frostBagHardActive?Math.floor(chosen.length/2):0;
+    chosen.forEach((i,n)=>{
+      t[i]=n<hardCount?('FROSTHARD_FULL_'+t[i]):('FROST_'+t[i]);
+    });
+  }
+  // Trash Bag: one mino per bag is a trash cell
+  if(trashBagActive){
+    const plain=t.map((v,i)=>({v,i})).filter(({v})=>typeof v==='string'&&v.length<=1);
+    if(plain.length>0){
+      const {v,i}=plain[~~(Math.random()*plain.length)];
+      t[i]=makeTrashMinoToken(v);
+    }
   }
   for(let i=t.length-1;i>0;i--){const j=~~(Math.random()*(i+1));[t[i],t[j]]=[t[j],t[i]];}
   return t;
@@ -779,13 +842,19 @@ function nextFromBag(){
   return t;
 }
 function spawnPiece(type,resetHold){
-  const isFrost=typeof type==='string'&&type.startsWith('FROST_')&&!type.startsWith('FROST_CRACKED_');
+  const isFrost=typeof type==='string'&&type.startsWith('FROST_')&&!type.startsWith('FROST_CRACKED_')&&!type.startsWith('FROST_HARD_');
+  const isFrostHardFull=typeof type==='string'&&type.startsWith('FROSTHARD_FULL_');
   const isFrostMino=isFrostMinoPiece(type);
-  let baseType,frostMinoR=-1,frostMinoC=-1;
+  const isFrostHardMino=isFrostHardMinoPiece(type);
+  const isTrashMino=isTrashMinoPiece(type);
+  let baseType,frostMinoR=-1,frostMinoC=-1,frostHardMinoR=-1,frostHardMinoC=-1,trashMinoR=-1,trashMinoC=-1;
   if(isFrost){baseType=type.slice(6);}
+  else if(isFrostHardFull){baseType=type.slice(15);}
   else if(isFrostMino){const p=parseFrostMino(type);baseType=p.baseType;frostMinoR=p.frostR;frostMinoC=p.frostC;}
+  else if(isFrostHardMino){const p=parseFrostHardMino(type);baseType=p.baseType;frostHardMinoR=p.frostR;frostHardMinoC=p.frostC;}
+  else if(isTrashMino){const p=parseTrashMino(type);baseType=p.baseType;trashMinoR=p.trashR;trashMinoC=p.trashC;}
   else{baseType=type;}
-  cur={type,shape:PIECES[baseType].shape.map(r=>[...r]),isFrost,isFrostMino,frostMinoR,frostMinoC,baseType};
+  cur={type,shape:PIECES[baseType].shape.map(r=>[...r]),isFrost,isFrostHardFull,isFrostMino,frostMinoR,frostMinoC,isFrostHardMino,frostHardMinoR,frostHardMinoC,isTrashMino,trashMinoR,trashMinoC,baseType};
   curRot=0;curFlipped=false;curX=~~((COLS-cur.shape[0].length)/2);curY=0;
   lockTimer=null;lockMoves=0;lastRotated=false;
   if(resetHold)holdUsed=false;
@@ -822,34 +891,65 @@ function isGrounded(){return!canPlace(cur.shape,curX,curY+1);}
 // ── LOCK & CLEAR ──────────────────────────────────────────────────────────────
 function lock(){
   const tspin=isTSpin(),allspin=!tspin&&allSpinActive&&isAllSpin();
+  const trashCols=[];
   for(let y=0;y<cur.shape.length;y++)for(let x=0;x<cur.shape[y].length;x++){
     if(!cur.shape[y][x])continue;
     const ny=curY+y,nx=curX+x;if(ny<0)continue;
     let cellVal;
     if(cur.isFrost){
       cellVal='FROST_'+cur.baseType;
+    } else if(cur.isFrostHardFull){
+      cellVal='FROST_HARD_'+cur.baseType;
+    } else if(isFrostHardMinoCell(y,x)){
+      cellVal='FROST_HARD_'+cur.baseType;
     } else if(isFrostMinoCell(y,x)){
       cellVal='FROST_'+cur.baseType;
+    } else if(isTrashMinoCell(y,x)){
+      cellVal='TRASH_'+cur.baseType;
+      trashCols.push(nx);
     } else {
       cellVal=cur.baseType;
     }
     board[ny][nx]=cellVal;
   }
-  clearLines(tspin,allspin);
+  clearLines(tspin,allspin,trashCols);
   const next=nextPieces.shift();nextPieces.push(nextFromBag());spawnPiece(next,true);
 }
 
-function clearLines(tspin,allspin){
+function clearLines(tspin,allspin,trashCols){
+  trashCols=trashCols||[];
   let cleared=0;
+  // Track which rows contained trash cells (for garbage injection keyed by column)
+  const trashRowCols=[]; // per cleared row: array of trash columns that were in it
   for(let r=ROWS-1;r>=0;r--){
     const row=board[r];
     const isFull=row.every(c=>c!==null);
     const isSpecial=row.some(c=>c==='PERM'||isDejaCell(c));
     if(isFull&&!isSpecial){
-      // Frost two-clear: intact frost cells crack instead of being cleared
-      const hasFrost=row.some(c=>isFrostCell(c));
-      if(hasFrost){
-        // Crack intact frost cells; everything else (normal/cracked) gets nulled
+      // Collect trash columns in this row before any modification
+      const rowTrashCols=[];
+      for(let c=0;c<COLS;c++){if(isTrashCell(row[c]))rowTrashCols.push(c);}
+
+      // Frost-hard (3-clear): hard cells step down to regular frost
+      const hasFrostHard=row.some(c=>isFrostHard(c));
+      // Frost (2-clear): regular frost cells crack
+      const hasFrost=!hasFrostHard&&row.some(c=>isFrostCell(c));
+
+      if(hasFrostHard){
+        // Step 1 of 3: hard-frost → frost; everything else nulled; row stays (not spliced)
+        for(let c=0;c<COLS;c++){
+          if(isFrostHard(row[c])){
+            board[r][c]='FROST_'+frostBaseType(row[c]); // demote to regular frost
+          } else if(isFrostCell(row[c])||isFrostCracked(row[c])){
+            board[r][c]=null; // other frost cells also clear
+          } else {
+            board[r][c]=null;
+          }
+        }
+        cleared++;r++;
+        if(rowTrashCols.length)trashRowCols.push(rowTrashCols);
+      } else if(hasFrost){
+        // Step 2 of 3 (or 1 of 2): regular frost → cracked; everything else nulled
         for(let c=0;c<COLS;c++){
           if(isFrostCell(row[c])){
             board[r][c]='FROST_CRACKED_'+frostBaseType(row[c]);
@@ -857,18 +957,30 @@ function clearLines(tspin,allspin){
             board[r][c]=null;
           }
         }
-        // Row is no longer full (has nulls), count the clear, but don't splice
         cleared++;r++;
+        if(rowTrashCols.length)trashRowCols.push(rowTrashCols);
       } else {
-        board.splice(r,1);board.unshift(Array(COLS).fill(null));cleared++;r++;
+        // Normal clear (also handles cracked-only rows)
+        board.splice(r,1);board.unshift(Array(COLS).fill(null));
+        cleared++;r++;
+        if(rowTrashCols.length)trashRowCols.push(rowTrashCols);
       }
     }
   }
 
+  // Trash Bag: inject a garbage line for each cleared row that contained trash cells
+  // The garbage line has holes exactly where the trash minos were
+  for(const cols of trashRowCols){
+    const garbageRow=Array(COLS).fill('TRASH_GARBAGE'); // solid garbage
+    for(const c of cols)garbageRow[c]=null; // hole at each trash mino column
+    board.splice(0,1); // remove top row to make room
+    board.push(garbageRow); // add at bottom
+  }
+
   if(cleared===0){combo=-1;updateUI();return;}
 
-  // Perfect clear: no normal cells remain
-  const isPC=board.every(row=>row.every(c=>!c||c==='PERM'||isDejaCell(c)||isFrostCracked(c)));
+  // Perfect clear: no normal cells remain (also exclude frost-hard and trash garbage)
+  const isPC=board.every(row=>row.every(c=>!c||c==='PERM'||isDejaCell(c)||isFrostCracked(c)||isFrostHard(c)));
   lines+=cleared;
   linesToNextLevel-=cleared;
   combo++;
@@ -1169,17 +1281,18 @@ function draw(){
     if(gy!==curY){
       for(let y=0;y<cur.shape.length;y++)for(let x=0;x<cur.shape[y].length;x++){
         if(!cur.shape[y][x])continue;
-        const isFM=isFrostMinoCell(y,x);
+        const isFM=isFrostMinoCell(y,x),isFHM=isFrostHardMinoCell(y,x),isTM=isTrashMinoCell(y,x);
         ctx.globalAlpha=.3;
-        ctx.fillStyle=(cur.isFrost||isFM)?'#b0eeff':(blindfoldedMono?'#888':PIECE_COLORS[cur.baseType]);
+        const ghostCol=cur.isFrostHardFull?(blindfoldedMono?'#aabbcc':'#e8f8ff'):cur.isFrost?(blindfoldedMono?'#6699aa':'#7ad4f0'):isFHM?(blindfoldedMono?'#aabbcc':'#e8f8ff'):isFM?(blindfoldedMono?'#6699aa':'#7ad4f0'):isTM?(blindfoldedMono?'#887766':'#8B5E3C'):(blindfoldedMono?'#888':PIECE_COLORS[cur.baseType]);
+        ctx.fillStyle=ghostCol;
         ctx.fillRect((curX+x)*CELL+1,(gy+y)*CELL+1,CELL-2,CELL-2);ctx.globalAlpha=1;
       }
     }
   }
   for(let y=0;y<cur.shape.length;y++)for(let x=0;x<cur.shape[y].length;x++){
     if(!cur.shape[y][x])continue;
-    const isFM=isFrostMinoCell(y,x);
-    const col=cur.isFrost?'#b0eeff':isFM?'#b0eeff':(blindfoldedMono?'#888':PIECE_COLORS[cur.baseType]);
+    const isFM=isFrostMinoCell(y,x),isFHM=isFrostHardMinoCell(y,x),isTM=isTrashMinoCell(y,x);
+    const col=cur.isFrostHardFull?(blindfoldedMono?'#aabbcc':'#e8f8ff'):cur.isFrost?(blindfoldedMono?'#6699aa':'#7ad4f0'):isFHM?(blindfoldedMono?'#aabbcc':'#e8f8ff'):isFM?(blindfoldedMono?'#6699aa':'#7ad4f0'):isTM?(blindfoldedMono?'#887766':'#8B5E3C'):(blindfoldedMono?'#888':PIECE_COLORS[cur.baseType]);
     drawCell(col,curX+x,curY+y,ctx);
   }
   // Mirror mod indicator: show a small "⟺" hint near the top when active
@@ -1212,18 +1325,27 @@ function drawHold(){
     hctx.font='bold 14px Segoe UI';hctx.textAlign='center';hctx.textBaseline='middle';
     hctx.fillText(hold?'???':'—',50,40);
   } else if(hold){
-    const isFrostH=typeof hold==='string'&&hold.startsWith('FROST_')&&!hold.startsWith('FROST_CRACKED_');
+    const isFrostH=typeof hold==='string'&&hold.startsWith('FROST_')&&!hold.startsWith('FROST_CRACKED_')&&!hold.startsWith('FROST_HARD_');
+    const isFrostHardFullH=typeof hold==='string'&&hold.startsWith('FROSTHARD_FULL_');
     const isFrostMinoH=isFrostMinoPiece(hold);
-    let baseH,frostRH=-1,frostCH=-1;
+    const isFrostHardMinoH=isFrostHardMinoPiece(hold);
+    const isTrashMinoH=isTrashMinoPiece(hold);
+    let baseH,frostRH=-1,frostCH=-1,frostHardRH=-1,frostHardCH=-1,trashRH=-1,trashCH=-1;
     if(isFrostH){baseH=hold.slice(6);}
+    else if(isFrostHardFullH){baseH=hold.slice(15);}
     else if(isFrostMinoH){const p=parseFrostMino(hold);baseH=p.baseType;frostRH=p.frostR;frostCH=p.frostC;}
+    else if(isFrostHardMinoH){const p=parseFrostHardMino(hold);baseH=p.baseType;frostHardRH=p.frostR;frostHardCH=p.frostC;}
+    else if(isTrashMinoH){const p=parseTrashMino(hold);baseH=p.baseType;trashRH=p.trashR;trashCH=p.trashC;}
     else{baseH=hold;}
     const sh=PIECES[baseH].shape,cs=20,cols=sh[0].length,rows=sh.length;
     const ox=~~((100-cols*cs)/2),oy=~~((80-rows*cs)/2);
     for(let y=0;y<rows;y++)for(let x=0;x<cols;x++){
       if(!sh[y][x])continue;
       const isFM=isFrostMinoH&&y===frostRH&&x===frostCH;
-      hctx.fillStyle=holdUsed?'#444':(isFrostH||isFM)?'#b0eeff':PIECE_COLORS[baseH];
+      const isFHM=isFrostHardMinoH&&y===frostHardRH&&x===frostHardCH;
+      const isTM=isTrashMinoH&&y===trashRH&&x===trashCH;
+      const fCol=isFrostHardFullH?'#e8f8ff':isFrostH?'#7ad4f0':isFHM?'#e8f8ff':isFM?'#7ad4f0':isTM?'#8B5E3C':PIECE_COLORS[baseH];
+      hctx.fillStyle=holdUsed?'#444':fCol;
       hctx.fillRect(ox+x*cs+1,oy+y*cs+1,cs-2,cs-2);
       if(!holdUsed){hctx.fillStyle='rgba(255,255,255,0.15)';hctx.fillRect(ox+x*cs+2,oy+y*cs+2,cs-4,5);}
     }
@@ -1234,18 +1356,26 @@ function drawNext(){
   const n=minimalistActive?1:3;
   for(let i=0;i<n;i++){
     const t=nextPieces[i];if(!t)continue;
-    const isFrost=typeof t==='string'&&t.startsWith('FROST_')&&!t.startsWith('FROST_CRACKED_');
+    const isFrost=typeof t==='string'&&t.startsWith('FROST_')&&!t.startsWith('FROST_CRACKED_')&&!t.startsWith('FROST_HARD_');
+    const isFrostHardFull=typeof t==='string'&&t.startsWith('FROSTHARD_FULL_');
     const isFrostMino=isFrostMinoPiece(t);
-    let baseT,frostRT=-1,frostCT=-1;
+    const isFrostHardMino=isFrostHardMinoPiece(t);
+    const isTrashMino=isTrashMinoPiece(t);
+    let baseT,frostRT=-1,frostCT=-1,frostHardRT=-1,frostHardCT=-1,trashRT=-1,trashCT=-1;
     if(isFrost){baseT=t.slice(6);}
+    else if(isFrostHardFull){baseT=t.slice(15);}
     else if(isFrostMino){const p=parseFrostMino(t);baseT=p.baseType;frostRT=p.frostR;frostCT=p.frostC;}
+    else if(isFrostHardMino){const p=parseFrostHardMino(t);baseT=p.baseType;frostHardRT=p.frostR;frostHardCT=p.frostC;}
+    else if(isTrashMino){const p=parseTrashMino(t);baseT=p.baseType;trashRT=p.trashR;trashCT=p.trashC;}
     else{baseT=t;}
     const sh=PIECES[baseT].shape,cs=18,cols=sh[0].length,rows=sh.length;
     const ox=~~((160-cols*cs)/2),oy=10+i*96+~~((80-rows*cs)/2);
     for(let y=0;y<rows;y++)for(let x=0;x<cols;x++){
       if(!sh[y][x])continue;
       const isFM=isFrostMino&&y===frostRT&&x===frostCT;
-      nctx.fillStyle=minimalistMono?'#666':(isFrost||isFM)?'#b0eeff':PIECE_COLORS[baseT];
+      const isFHM=isFrostHardMino&&y===frostHardRT&&x===frostHardCT;
+      const isTM=isTrashMino&&y===trashRT&&x===trashCT;
+      nctx.fillStyle=minimalistMono?'#666':isFrostHardFull?'#e8f8ff':isFrost?'#7ad4f0':isFHM?'#e8f8ff':isFM?'#7ad4f0':isTM?'#8B5E3C':PIECE_COLORS[baseT];
       nctx.fillRect(ox+x*cs+1,oy+y*cs+1,cs-2,cs-2);
     }
   }
@@ -1321,9 +1451,10 @@ function startGame(){
   blackoutActive=false;blackoutDelay=5000;earthquakeActive=false;
   minimalistActive=false;minimalistMono=false;oSpinMetaActive=false;
   thinBagRemove=0;thinBagAddBack=false;thinBagExcluded=[];
-  mirrorActive=false;frostBagMiniActive=false;frostBagActive=false;tetrapleActive=false;tTetrominoActive=false;
+  mirrorActive=false;frostBagActive=false;frostBagHardActive=false;tetrapleActive=false;tTetrominoActive=false;
   btbChainActive=false;btbChainPlus=false;btbChainStack=0;
   flowMeterActive=false;flowMeter=0;
+  trashBagActive=false;
   cheatBuffer='';
   softDropHeld=false;
   if(blackoutTimer)clearTimeout(blackoutTimer);blackoutTimer=null;blackoutVisible=false;
