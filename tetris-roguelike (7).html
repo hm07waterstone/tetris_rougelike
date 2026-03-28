@@ -1,0 +1,1379 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Tetris Roguelike</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#0a0a0f;color:#eee;font-family:'Segoe UI',sans-serif;display:flex;justify-content:center;align-items:center;min-height:100vh;overflow:hidden}
+#titleScreen{position:fixed;inset:0;background:#0a0a0f;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:100}
+#titleCanvas{position:absolute;inset:0;opacity:.18}
+.title-content{position:relative;display:flex;flex-direction:column;align-items:center;gap:10px}
+.title-logo{font-size:52px;font-weight:900;letter-spacing:4px;background:linear-gradient(135deg,#0ff,#a0f,#f80);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.title-sub{font-size:13px;color:#666;letter-spacing:3px;text-transform:uppercase;margin-bottom:32px}
+.title-menu{display:flex;flex-direction:column;gap:10px;width:220px}
+.title-btn{background:#111;border:1px solid #333;color:#eee;padding:12px;border-radius:8px;cursor:pointer;font-size:15px;text-align:center;transition:background .15s,border-color .15s;letter-spacing:1px;user-select:none}
+.title-btn:hover{background:#1e1e2e;border-color:#666}
+.title-btn.primary{border-color:#a0f;color:#c8f}
+.title-btn.primary:hover{background:#1a0a2e}
+#aboutScreen{position:fixed;inset:0;background:#0a0a0f;display:none;flex-direction:column;align-items:center;z-index:100;overflow-y:auto;padding:30px 20px}
+.about-inner{display:flex;flex-direction:column;align-items:center;gap:14px;max-width:580px;width:100%}
+.about-logo{font-size:34px;font-weight:900;letter-spacing:3px;background:linear-gradient(135deg,#0ff,#a0f,#f80);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:2px}
+.about-sub{font-size:11px;color:#555;letter-spacing:3px;text-transform:uppercase;margin-bottom:4px}
+.about-card{background:#111;border:1px solid #222;border-radius:8px;padding:14px 18px;width:100%}
+.about-card h3{font-size:11px;color:#666;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:8px}
+.about-card p{font-size:13px;color:#bbb;line-height:1.65}
+.about-card p+p{margin-top:6px}
+.about-mods{display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-top:4px}
+.about-mod{font-size:11px;padding:4px 8px;border-radius:4px;line-height:1.5}
+.about-back{width:100%;margin-top:4px}
+#keybindScreen{position:fixed;inset:0;background:#0a0a0f;display:none;flex-direction:column;align-items:center;justify-content:center;z-index:100;gap:20px}
+#keybindScreen h2{font-size:26px;letter-spacing:2px;color:#c8f}
+#keybindScreen p{color:#555;font-size:12px;margin-top:-12px}
+.kb-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;width:420px}
+.kb-row{display:flex;align-items:center;justify-content:space-between;background:#111;border:1px solid #222;border-radius:6px;padding:8px 12px}
+.kb-label{font-size:13px;color:#aaa}
+.kb-btn{background:#1a1a2e;border:1px solid #444;color:#fff;padding:5px 14px;border-radius:5px;cursor:pointer;font-size:13px;min-width:90px;text-align:center}
+.kb-btn:hover{border-color:#888}
+.kb-btn.listening{border-color:#a0f;color:#c8f;background:#1a0a2e;animation:pulse .8s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+.kb-actions{display:flex;gap:10px;margin-top:6px}
+#gameUI{display:none;flex-direction:row;gap:16px;align-items:flex-start}
+canvas{display:block;image-rendering:pixelated}
+#gameCanvas{border:2px solid #333}
+.panel{width:140px;display:flex;flex-direction:column;gap:10px}
+.panel-right{width:180px;display:flex;flex-direction:column;gap:10px}
+.box{background:#111;border:1px solid #333;border-radius:6px;padding:10px}
+.box h3{font-size:11px;color:#888;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px}
+.box .val{font-size:20px;font-weight:bold;color:#fff}
+.box .sub{font-size:11px;color:#666}
+.btb-off{font-size:13px;color:#444}
+.btb-on{font-size:13px;font-weight:bold;color:#f80;text-shadow:0 0 8px #f804}
+.modifier-tag{font-size:10px;padding:3px 6px;border-radius:4px;margin-bottom:3px;line-height:1.4;display:inline-block}
+.mod-yellow{background:#1a1a00;border-left:3px solid #cc0;color:#ee8}
+.mod-orange{background:#1a1000;border-left:3px solid #f80;color:#fc8}
+.mod-red{background:#2a0000;border-left:3px solid #e00;color:#faa}
+.mod-green{background:#001800;border-left:3px solid #0c0;color:#8e8}
+#overlay{position:fixed;inset:0;background:rgba(0,0,0,.88);display:none;flex-direction:column;align-items:center;justify-content:center;z-index:10}
+.btn{background:#222;border:1px solid #555;color:#fff;padding:10px 28px;border-radius:6px;cursor:pointer;font-size:15px;transition:background .15s}
+.btn:hover{background:#333}
+.btn-red{background:#2a0000;border:2px solid #e00;color:#faa;padding:12px 36px;font-size:16px;font-weight:bold;border-radius:8px;cursor:pointer;transition:background .15s}
+.btn-red:hover{background:#3a0000}
+#modOverlay{position:fixed;inset:0;background:rgba(0,0,0,.92);display:none;flex-direction:column;align-items:center;justify-content:center;z-index:10}
+#modOverlay h2{font-size:24px;margin-bottom:6px}
+#modOverlay .hint{color:#888;font-size:13px;margin-bottom:24px}
+.mod-cards{display:flex;gap:16px}
+.mod-card{width:200px;background:#161616;border:2px solid #333;border-radius:10px;padding:18px;cursor:pointer;transition:border-color .15s,transform .15s,box-shadow .15s}
+.mod-card:hover{border-color:#888;transform:translateY(-4px)}
+.mod-card h3{font-size:16px;margin-bottom:8px}
+.mod-card p{font-size:12px;color:#aaa;line-height:1.5}
+#graceOverlay{position:fixed;inset:0;background:rgba(0,0,0,.7);display:none;flex-direction:column;align-items:center;justify-content:center;z-index:9;pointer-events:none}
+#graceText{font-size:80px;font-weight:900;color:#c8f;text-shadow:0 0 40px #a0f8}
+#graceSub{font-size:18px;color:#888;margin-top:8px}
+#winScreen{position:fixed;inset:0;background:rgba(0,0,0,.92);display:none;flex-direction:column;align-items:center;justify-content:center;z-index:20;gap:14px}
+#winScreen h1{font-size:36px;color:#ff0;text-shadow:0 0 20px #ff08}
+.win-stat{font-size:20px;font-weight:bold}
+.win-mods{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;max-width:500px;margin:4px 0}
+.win-btns{display:flex;gap:12px;margin-top:8px}
+.go-mods{display:flex;flex-wrap:wrap;gap:5px;justify-content:center;max-width:420px;margin-top:4px}
+#flowMeterSide{display:none;flex-direction:column;align-items:center;justify-content:space-between;gap:2px;width:16px;align-self:stretch;padding:2px 0}
+.flow-seg{width:12px;flex:1;border-radius:2px;transition:background .1s,box-shadow .1s;border:1px solid #1a1a1a;min-height:0}
+#flowMeterSide .flow-label{font-size:8px;color:#555;font-family:monospace;text-align:center;line-height:1;writing-mode:vertical-rl;transform:rotate(180deg);letter-spacing:1px;flex-shrink:0}
+</style>
+</head>
+<body>
+
+<div id="titleScreen">
+  <canvas id="titleCanvas"></canvas>
+  <div class="title-content">
+    <div class="title-logo">TETRIS</div>
+    <div class="title-sub">Roguelike</div>
+    <div class="title-menu">
+      <div class="title-btn primary" onclick="startGame()">▶ Play</div>
+      <div class="title-btn" onclick="showAbout()">? About</div>
+      <div class="title-btn" onclick="showKeybinds()">⌨ Keybinds</div>
+    </div>
+  </div>
+</div>
+
+<div id="aboutScreen">
+  <div class="about-inner">
+    <div class="about-logo">TETRIS</div>
+    <div class="about-sub">Roguelike — Field Guide</div>
+    <div class="about-card">
+      <h3>🎮 The Concept</h3>
+      <p>Classic Tetris — but every level-up warps the rules. Clear lines to level up. At each level threshold the game freezes and forces you to choose one of three <strong style="color:#ee8">Modifiers</strong>: permanent rule changes that stack for the rest of your run. Some are blessings. Most are curses with score bonuses attached.</p>
+      <p>Survive to <strong style="color:#c8f">Level 15</strong> to win. Dare to continue past victory and the game punishes you with 3 permanent lines and a harder level — but modifier picks keep coming.</p>
+    </div>
+    <div class="about-card">
+      <h3>📊 Scoring</h3>
+      <p>
+        <span style="color:#aaa">Single:</span> 100 &nbsp;·&nbsp; <span style="color:#aaa">Double:</span> 300 &nbsp;·&nbsp; <span style="color:#aaa">Triple:</span> 500 &nbsp;·&nbsp; <span style="color:#aaa">Tetris:</span> 800 — all × level<br>
+        <span style="color:#aaa">T-Spin Single / Double / Triple:</span> 200 / 400 / 1600 × level<br>
+        <span style="color:#aaa">Back-to-Back:</span> ×1.5 on qualifying clears (Tetris, T-Spins, All-Spins, PCs)<br>
+        <span style="color:#aaa">Combo:</span> +50 × combo count × level per consecutive clear<br>
+        <span style="color:#aaa">Perfect Clear:</span> +3000 × level &nbsp;·&nbsp; <span style="color:#aaa">Soft Drop:</span> +1/row &nbsp;·&nbsp; <span style="color:#aaa">Hard Drop:</span> +2/row
+      </p>
+    </div>
+    <div class="about-card">
+      <h3>🧊 Special Cell Types</h3>
+      <p><strong style="color:#b0eeff">Frost Cells</strong> — Left by frost pieces (Frost Bag mod). Icy blue. They resist a line clear: the first clear <em>cracks</em> them (darker, visibly fractured) and nulls the rest of the row, but doesn't remove the row. Fill the row again and clear it a second time to break them for good.</p>
+      <p><strong style="color:#e44">Wound Lines</strong> — Inserted by Déjà Vu when you repeat the same clear type. Each wound row has a countdown (shown on the leftmost cell). It ticks down by lines cleared each turn; when it hits 0 the row erases itself entirely. They cannot be line-cleared directly.</p>
+      <p><strong style="color:#555">Permanent Lines</strong> — Unbreakable grey rows added by Bedrock and post-win Continue. They sit at the very bottom, forever.</p>
+    </div>
+    <div class="about-card">
+      <h3>⚡ Modifiers</h3>
+      <div class="about-mods">
+        <div class="about-mod mod-yellow"><strong>Bedrock</strong> — 2 perm lines, level −1</div>
+        <div class="about-mod mod-yellow"><strong>Blindfolded</strong> — No ghost, +2000 pts</div>
+        <div class="about-mod mod-orange"><strong>Blindfolded+</strong> — No ghost, board turns grey</div>
+        <div class="about-mod mod-yellow"><strong>O-Spin Meta</strong> — T-spins ×1.5, +1 O per bag</div>
+        <div class="about-mod mod-orange"><strong>O-Spin Meta+</strong> — All-spin enabled, +2 O per bag</div>
+        <div class="about-mod mod-yellow"><strong>All-In</strong> — B2B bonus ×2, non-B2B scores 0</div>
+        <div class="about-mod mod-yellow"><strong>No DAS</strong> — No auto-repeat, score ×1.75</div>
+        <div class="about-mod mod-orange"><strong>Permafrost</strong> — No DAS + wall-snap, score ×4</div>
+        <div class="about-mod mod-yellow"><strong>Déjà Vu</strong> — Repeat clears add wound lines, ×1.5</div>
+        <div class="about-mod mod-orange"><strong>Déjà Vu+</strong> — Wounds last 20 lines, ×2.5</div>
+        <div class="about-mod mod-yellow"><strong>Blackout</strong> — Board hidden 5s/shown 1s, ×1.5</div>
+        <div class="about-mod mod-orange"><strong>Blackout+</strong> — Hidden 10s/shown 1s, ×3 total</div>
+        <div class="about-mod mod-yellow"><strong>Earthquake</strong> — Board shifts every 10 pieces, ×2</div>
+        <div class="about-mod mod-yellow"><strong>Minimalist</strong> — 1 next piece shown, ×1.25</div>
+        <div class="about-mod mod-orange"><strong>Minimalist+</strong> — 1 grey next piece, ×1.5</div>
+        <div class="about-mod mod-yellow"><strong>Amnesia</strong> — Hold hidden but usable, ×1.5</div>
+        <div class="about-mod mod-orange"><strong>Amnesia+</strong> — Hold fully disabled, ×2</div>
+        <div class="about-mod mod-yellow"><strong>Overdrive</strong> — +3 levels now, score ×0.5</div>
+        <div class="about-mod mod-yellow"><strong>Thin Bag</strong> — 1 type removed per bag, ×1.5</div>
+        <div class="about-mod mod-orange"><strong>Thin Bag+</strong> — 3 removed, +1 back, ×2.5</div>
+        <div class="about-mod mod-yellow"><strong>Mirror</strong> — 180° key flips piece instead, ×1.5</div>
+        <div class="about-mod mod-yellow"><strong>Frost Bag</strong> — 1 piece/bag has one frost mino; needs 2 clears</div>
+        <div class="about-mod mod-orange"><strong>Frost Bag+</strong> — Full frost piece per bag; all cells need 2 clears</div>
+        <div class="about-mod mod-yellow"><strong>Tetraple</strong> — Triples → B2B (800pts); Tetrises → non-B2B (500pts)</div>
+        <div class="about-mod mod-yellow"><strong>T-Tetramino</strong> — All I-pieces become T-pieces (incl. current bag), ×1.5</div>
+        <div class="about-mod mod-yellow"><strong>BTB Chain</strong> — B2B stack (cap 25) scales BTB bonus: ×1.25…×2.50</div>
+        <div class="about-mod mod-yellow"><strong>Flow Meter</strong> — Eval bar: qualifying +1, non-qualifying −1. Overflow→500pts, underflow→wound row</div>
+        <div class="about-mod mod-orange"><strong>BTB Chain+</strong> — ×1.35…×3.10 per tier; breaking adds wound rows per tier</div>
+      </div>
+    </div>
+    <div class="about-card">
+      <h3>⌨ Controls (defaults — all rebindable)</h3>
+      <p>
+        <span style="color:#888">Move:</span> ← → &nbsp;·&nbsp; <span style="color:#888">Soft Drop:</span> ↓ &nbsp;·&nbsp; <span style="color:#888">Hard Drop:</span> Space<br>
+        <span style="color:#888">Rotate CW / CCW / 180°:</span> ↑ / Z / A &nbsp;·&nbsp; <span style="color:#888">Hold:</span> C
+      </p>
+    </div>
+    <div id="secretsCard" class="about-card" style="border-color:#1a1a1a">
+      <h3 style="color:#333">🔒 Secrets</h3>
+      <p style="color:#444">There are hidden cheat codes. You'll know one when you see it.</p>
+    </div>
+    <div class="title-btn about-back" onclick="hideAbout()">← Back to Menu</div>
+  </div>
+</div>
+
+<div id="keybindScreen">
+  <h2>⌨ Keybinds</h2>
+  <p>Click a key to rebind. Press Escape to cancel.</p>
+  <div class="kb-grid" id="kbGrid"></div>
+  <div class="kb-actions">
+    <button class="title-btn" style="width:130px" onclick="resetKeybinds()">Reset Defaults</button>
+    <button class="title-btn primary" style="width:130px" onclick="saveKeybinds()">Save & Back</button>
+  </div>
+</div>
+
+<div id="gameUI">
+  <div class="panel">
+    <div class="box"><h3>Hold</h3><canvas id="holdCanvas" width="100" height="80"></canvas></div>
+    <div class="box"><h3 id="scoreLabelEl">Score</h3><div class="val" id="scoreEl">0</div></div>
+    <div class="box"><h3>Level</h3><div class="val" id="levelEl">1</div></div>
+    <div class="box"><h3>Lines</h3><div class="val" id="linesEl">0</div><div class="sub" id="nextModEl">Next lv: 10</div></div>
+    <div class="box"><h3>Combo</h3><div class="val" id="comboEl">0</div></div>
+    <div class="box"><h3>Back-to-Back</h3><div id="btbEl" class="btb-off">—</div><div id="btbChainEl" style="font-size:10px;color:#444;margin-top:3px;font-family:monospace;display:none"></div></div>
+  </div>
+  <div id="flowMeterSide">
+    <div class="flow-label">FLOW</div>
+    <!-- 20 segments: fseg19=+15 (top/overflow) down to fseg0=-5 (bottom/danger) -->
+    <div class="flow-seg" id="fseg19"></div>
+    <div class="flow-seg" id="fseg18"></div>
+    <div class="flow-seg" id="fseg17"></div>
+    <div class="flow-seg" id="fseg16"></div>
+    <div class="flow-seg" id="fseg15"></div>
+    <div class="flow-seg" id="fseg14"></div>
+    <div class="flow-seg" id="fseg13"></div>
+    <div class="flow-seg" id="fseg12"></div>
+    <div class="flow-seg" id="fseg11"></div>
+    <div class="flow-seg" id="fseg10"></div>
+    <div class="flow-seg" id="fseg9"></div>
+    <div class="flow-seg" id="fseg8"></div>
+    <div class="flow-seg" id="fseg7"></div>
+    <div class="flow-seg" id="fseg6"></div>
+    <div class="flow-seg" id="fseg5"></div>
+    <div style="height:3px;width:100%;background:#444;flex-shrink:0"></div>
+    <div class="flow-seg" id="fseg4"></div>
+    <div class="flow-seg" id="fseg3"></div>
+    <div class="flow-seg" id="fseg2"></div>
+    <div class="flow-seg" id="fseg1"></div>
+    <div class="flow-seg" id="fseg0"></div>
+  </div>
+  <canvas id="gameCanvas" width="300" height="600"></canvas>
+  <div class="panel-right">
+    <div class="box"><h3>Next</h3><canvas id="nextCanvas" width="160" height="300"></canvas></div>
+    <div class="box"><h3>Active Modifiers</h3><div id="modList" style="font-size:11px;color:#666;">None</div></div>
+  </div>
+</div>
+
+<div id="overlay"></div>
+<div id="modOverlay">
+  <h2>⚡ Choose a Modifier</h2>
+  <p class="hint">← → to navigate · Hard Drop to confirm</p>
+  <div class="mod-cards" id="modCards"></div>
+</div>
+<div id="graceOverlay">
+  <div id="graceText"></div>
+  <div id="graceSub"></div>
+</div>
+<div id="winScreen"></div>
+
+<script>
+// ── KEYBINDS ──────────────────────────────────────────────────────────────────
+const DEFAULT_BINDS={moveLeft:'ArrowLeft',moveRight:'ArrowRight',softDrop:'ArrowDown',hardDrop:'Space',rotateCW:'ArrowUp',rotateCCW:'KeyZ',rotate180:'KeyA',hold:'KeyC'};
+const BIND_LABELS={moveLeft:'Move Left',moveRight:'Move Right',softDrop:'Soft Drop',hardDrop:'Hard Drop',rotateCW:'Rotate CW',rotateCCW:'Rotate CCW',rotate180:'Rotate 180° / Flip',hold:'Hold',sonicDrop:'Sonic Drop'};
+let binds={...DEFAULT_BINDS},editBinds={...DEFAULT_BINDS},listeningFor=null;
+function showKeybinds(){document.getElementById('titleScreen').style.display='none';editBinds={...binds};renderKbGrid();document.getElementById('keybindScreen').style.display='flex';}
+function renderKbGrid(){const g=document.getElementById('kbGrid');g.innerHTML='';for(const[a,c]of Object.entries(editBinds)){const r=document.createElement('div');r.className='kb-row';r.innerHTML=`<span class="kb-label">${BIND_LABELS[a]}</span><button class="kb-btn" id="kbb_${a}" onclick="startListen('${a}')">${fmtKey(c)}</button>`;g.appendChild(r);}}
+function fmtKey(c){return c.replace('Arrow','').replace('Key','').replace('Digit','').replace('Numpad','Num').replace('ShiftLeft','L-Shift').replace('ShiftRight','R-Shift').replace('ControlLeft','L-Ctrl').replace('ControlRight','R-Ctrl').replace('AltLeft','L-Alt').replace('AltRight','R-Alt').replace('Space','Space');}
+function startListen(a){if(listeningFor){const o=document.getElementById(`kbb_${listeningFor}`);if(o){o.classList.remove('listening');o.textContent=fmtKey(editBinds[listeningFor]);}}listeningFor=a;const b=document.getElementById(`kbb_${a}`);b.classList.add('listening');b.textContent='Press key...';}
+function resetKeybinds(){editBinds={...DEFAULT_BINDS};renderKbGrid();}
+function saveKeybinds(){binds={...editBinds};listeningFor=null;document.getElementById('keybindScreen').style.display='none';document.getElementById('titleScreen').style.display='flex';}
+
+// ── ABOUT ─────────────────────────────────────────────────────────────────────
+function showAbout(){document.getElementById('titleScreen').style.display='none';document.getElementById('aboutScreen').style.display='flex';document.getElementById('aboutScreen').scrollTop=0;}
+function hideAbout(){document.getElementById('aboutScreen').style.display='none';document.getElementById('titleScreen').style.display='flex';}
+
+// ── CHEAT CODES ───────────────────────────────────────────────────────────────
+// Typed anywhere (about screen, title, in-game). Buffer resets after 2s of inactivity.
+let cheatBuffer='',cheatResetTimer=null;
+let sonicDropActive=false;     // SONIC: unlocks sonic drop key (ShiftLeft)
+
+function flashCheatMsg(msg,color){
+  let el=document.getElementById('cheatMsg');
+  if(!el){el=document.createElement('div');el.id='cheatMsg';Object.assign(el.style,{position:'fixed',bottom:'24px',left:'50%',transform:'translateX(-50%)',padding:'8px 22px',borderRadius:'8px',fontFamily:'Segoe UI,sans-serif',fontSize:'15px',fontWeight:'bold',letterSpacing:'2px',zIndex:'9999',pointerEvents:'none',transition:'opacity .4s'});document.body.appendChild(el);}
+  el.textContent=msg;el.style.background=color||'#1a0a2e';el.style.border=`1px solid ${color||'#a0f'}`;el.style.color='#fff';el.style.opacity='1';
+  clearTimeout(el._t);el._t=setTimeout(()=>el.style.opacity='0',1800);
+}
+
+function handleCheat(word){
+  if(word==='water'){
+    // WATER: W=Hold, E=180°/Flip, A=CCW, D=CW, S=Hard Drop, arrows=move/soft
+    binds.hold='KeyW';
+    binds.rotate180='KeyE';
+    binds.rotateCCW='KeyA';
+    binds.rotateCW='KeyD';
+    binds.hardDrop='KeyS';
+    binds.softDrop='ArrowDown';
+    binds.moveLeft='ArrowLeft';
+    binds.moveRight='ArrowRight';
+    // Propagate to editBinds so keybind screen shows correctly
+    Object.assign(editBinds,binds);
+    flashCheatMsg('🌊 WATER — WASD layout activated','#0a1a2e');
+  } else if(word==='sonic'){
+    sonicDropActive=!sonicDropActive;
+    if(sonicDropActive){
+      binds.sonicDrop='ShiftLeft';
+      editBinds.sonicDrop='ShiftLeft';
+    } else {
+      delete binds.sonicDrop;
+      delete editBinds.sonicDrop;
+    }
+    flashCheatMsg(sonicDropActive?'💨 SONIC — Sonic drop enabled (L-Shift)':'💨 SONIC — Sonic drop disabled','#001810');
+  } else if(word==='cheat'){
+    // Reveal the secrets card in the about screen
+    const card=document.getElementById('secretsCard');
+    if(card){
+      card.innerHTML=`<h3 style="color:#888">🔑 Cheat Codes</h3>
+        <p style="color:#666;font-size:12px;margin-bottom:8px">Type anywhere — no Enter. Buffer resets after 2s inactivity.</p>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <div style="display:flex;align-items:baseline;gap:10px">
+            <span style="font-family:monospace;font-size:13px;color:#0af;background:#061820;padding:2px 8px;border-radius:4px;letter-spacing:2px">WATER</span>
+            <span style="font-size:12px;color:#666">W=Hold, E=180°, A=CCW, D=CW, S=Hard Drop, arrows=move/soft.</span>
+          </div>
+          <div style="display:flex;align-items:baseline;gap:10px">
+            <span style="font-family:monospace;font-size:13px;color:#0f8;background:#001810;padding:2px 8px;border-radius:4px;letter-spacing:2px">SONIC</span>
+            <span style="font-size:12px;color:#666">Toggles sonic drop on L-Shift — instant fall, no auto-lock.</span>
+          </div>
+          <div style="display:flex;align-items:baseline;gap:10px">
+            <span style="font-family:monospace;font-size:13px;color:#f4f;background:#1a001a;padding:2px 8px;border-radius:4px;letter-spacing:2px">CHEAT</span>
+            <span style="font-size:12px;color:#666">You already know.</span>
+          </div>
+        </div>`;
+      card.style.borderColor='#333';
+    }
+    flashCheatMsg('🔑 CHEAT — secrets revealed','#1a001a');
+  }
+}
+
+document.addEventListener('keydown',function cheatListener(e){
+  // Only collect printable single-char keys; ignore modifier-combos
+  // Don't process cheats during active gameplay to avoid accidental triggers
+  if(gameRunning)return;
+  if(e.key.length!==1||e.ctrlKey||e.altKey||e.metaKey)return;
+  clearTimeout(cheatResetTimer);
+  cheatBuffer+=e.key.toLowerCase();
+  // Trim buffer to max length of longest cheat word
+  if(cheatBuffer.length>8)cheatBuffer=cheatBuffer.slice(-8);
+  cheatResetTimer=setTimeout(()=>cheatBuffer='',2000);
+  const cheats=['water','sonic','cheat'];
+  for(const c of cheats){
+    if(cheatBuffer.endsWith(c)){cheatBuffer='';handleCheat(c);break;}
+  }
+},true); // capture phase so it fires before game input
+
+// ── TITLE BG ──────────────────────────────────────────────────────────────────
+(function(){
+  const tc=document.getElementById('titleCanvas');tc.width=window.innerWidth;tc.height=window.innerHeight;
+  const tx=tc.getContext('2d'),CS=30;
+  const colors=['#0ff','#ff0','#a0f','#0f0','#f00','#00f','#f80'];
+  const SHAPES=[[[1,1,1,1]],[[1,1],[1,1]],[[0,1,0],[1,1,1]],[[0,1,1],[1,1,0]],[[1,1,0],[0,1,1]],[[1,0,0],[1,1,1]],[[0,0,1],[1,1,1]]];
+  const ps=[];for(let i=0;i<18;i++)ps.push({x:Math.random()*tc.width,y:Math.random()*tc.height,color:colors[~~(Math.random()*colors.length)],vx:(Math.random()-.5)*.4,vy:Math.random()*.5+.2,shape:~~(Math.random()*7)});
+  function anim(){tx.clearRect(0,0,tc.width,tc.height);ps.forEach(p=>{p.x+=p.vx;p.y+=p.vy;if(p.y>tc.height+60)p.y=-60;if(p.x<-60)p.x=tc.width+60;if(p.x>tc.width+60)p.x=-60;const sh=SHAPES[p.shape];tx.fillStyle=p.color;sh.forEach((row,ry)=>row.forEach((c,rx)=>{if(c)tx.fillRect(p.x+rx*CS,p.y+ry*CS,CS-2,CS-2);}));});requestAnimationFrame(anim);}
+  anim();
+})();
+
+// ── CONSTANTS ─────────────────────────────────────────────────────────────────
+const COLS=10,ROWS=20,CELL=30;
+const ctx=document.getElementById('gameCanvas').getContext('2d');
+const hctx=document.getElementById('holdCanvas').getContext('2d');
+const nctx=document.getElementById('nextCanvas').getContext('2d');
+const PIECE_COLORS={I:'#0ff',O:'#ff0',T:'#a0f',S:'#0f0',Z:'#f00',J:'#00f',L:'#f80'};
+const PIECES={
+  I:{shape:[[0,0,0,0],[1,1,1,1],[0,0,0,0],[0,0,0,0]]},
+  O:{shape:[[1,1],[1,1]]},
+  T:{shape:[[0,1,0],[1,1,1],[0,0,0]]},
+  S:{shape:[[0,1,1],[1,1,0],[0,0,0]]},
+  Z:{shape:[[1,1,0],[0,1,1],[0,0,0]]},
+  J:{shape:[[1,0,0],[1,1,1],[0,0,0]]},
+  L:{shape:[[0,0,1],[1,1,1],[0,0,0]]}
+};
+const KICKS={
+  JLSTZ:{'0>1':[[-1,0],[-1,1],[0,-2],[-1,-2]],'1>0':[[1,0],[1,-1],[0,2],[1,2]],'1>2':[[1,0],[1,-1],[0,2],[1,2]],'2>1':[[-1,0],[-1,1],[0,-2],[-1,-2]],'2>3':[[1,0],[1,1],[0,-2],[1,-2]],'3>2':[[-1,0],[-1,-1],[0,2],[-1,2]],'3>0':[[-1,0],[-1,-1],[0,2],[-1,2]],'0>3':[[1,0],[1,1],[0,-2],[1,-2]]},
+  I:{'0>1':[[-2,0],[1,0],[-2,-1],[1,2]],'1>0':[[2,0],[-1,0],[2,1],[-1,-2]],'1>2':[[-1,0],[2,0],[-1,2],[2,-1]],'2>1':[[1,0],[-2,0],[1,-2],[-2,1]],'2>3':[[2,0],[-1,0],[2,1],[-1,-2]],'3>2':[[-2,0],[1,0],[-2,-1],[1,2]],'3>0':[[1,0],[-2,0],[1,-2],[-2,1]],'0>3':[[-1,0],[2,0],[-1,2],[2,-1]]}
+};
+const KICKS180={
+  JLSTZ:{'0>2':[[0,1],[1,1],[-1,1],[1,0],[-1,0]],'2>0':[[0,-1],[-1,-1],[1,-1],[-1,0],[1,0]],'1>3':[[1,0],[1,2],[1,1],[0,2],[0,1]],'3>1':[[-1,0],[-1,2],[-1,1],[0,2],[0,1]]},
+  I:{'0>2':[[0,-1],[0,1],[-1,-1],[1,1],[-1,0],[1,0]],'2>0':[[0,1],[0,-1],[1,1],[-1,-1],[1,0],[-1,0]],'1>3':[[1,0],[-1,0],[1,2],[-1,-2],[0,-1],[0,1]],'3>1':[[-1,0],[1,0],[-1,2],[1,-2],[0,1],[0,-1]]}
+};
+const NON_O_TYPES=['I','T','S','Z','J','L'];
+const WIN_LEVEL=15;
+
+// ── LEVEL SYSTEM ──────────────────────────────────────────────────────────────
+function linesPerLevel(lv){if(lv<10)return 10;if(lv<20)return 15;return 20;}
+
+// ── MODIFIERS ─────────────────────────────────────────────────────────────────
+const ALL_MODS=[
+  {id:'bedrock',name:'Bedrock',cls:'mod-yellow',staticLevel:true,
+   desc:'Adds 2 permanent (unbreakable) lines to the bottom, but level −1.',
+   apply(){addPermLines(2);level=Math.max(1,level-1);}},
+  {id:'blindfolded',name:'Blindfolded',cls:'mod-yellow',upgrades:['blindfolded_plus'],
+   desc:'Ghost piece removed, +2000 pts.',
+   apply(){blindfoldedActive=true;score+=2000;}},
+  {id:'blindfolded_plus',name:'Blindfolded+',cls:'mod-orange',upgradeOf:'blindfolded',
+   desc:'Ghost removed (+2000 pts) + board and current piece are monochromatic grey.',
+   apply(){blindfoldedActive=true;blindfoldedMono=true;score+=2000;}},
+  {id:'ospinmeta',name:'O-Spin Meta',cls:'mod-yellow',upgrades:['ospinmeta_plus'],
+   desc:'T-spins score ×1.5, but 1 extra O-piece added to every bag.',
+   apply(){tspinMultActive=true;oSpinMetaActive=true;}},
+  {id:'ospinmeta_plus',name:'O-Spin Meta+',cls:'mod-orange',upgradeOf:'ospinmeta',
+   desc:'T-spins ×1.5, all-spin clears score as T-spins, and 2 extra O-pieces per bag total.',
+   apply(){tspinMultActive=true;oSpinMetaActive=true;allSpinActive=true;}},
+  {id:'allin',name:'All-In',cls:'mod-yellow',
+   desc:'Back-to-back bonus ×2, but non-B2B clears, combos and drop points score 0.',
+   apply(){allInActive=true;}},
+  {id:'noDAS',name:'No DAS',cls:'mod-yellow',upgrades:['permafrost'],
+   desc:'DAS (auto-repeat) is removed — pieces only move one cell per key press. Score ×1.75.',
+   apply(){noDASActive=true;scoreMult*=1.75;}},
+  {id:'permafrost',name:'Permafrost',cls:'mod-orange',upgradeOf:'noDAS',
+   desc:'No DAS + pieces instantly snap to walls/minos. Score ×4 total (replaces ×1.75).',
+   apply(){noDASActive=true;scoreMult/=1.75;scoreMult*=4;permafrostActive=true;}},
+  {id:'dejavu',name:'Déjà Vu',cls:'mod-yellow',upgrades:['dejavu_plus'],
+   desc:'Score ×1.5. Repeating a clear type adds a wound line (10-line countdown); expires by removing itself.',
+   apply(){scoreMult*=1.5;dejaVuActive=true;}},
+  {id:'dejavu_plus',name:'Déjà Vu+',cls:'mod-orange',upgradeOf:'dejavu',
+   desc:'Wound lines count down from 20 instead of 10. Score ×2.5 (replaces base ×1.5).',
+   apply(){scoreMult/=1.5;scoreMult*=2.5;dejaVuActive=true;dejaVuPlus=true;}},
+  {id:'blackout',name:'Blackout',cls:'mod-yellow',upgrades:['blackout_plus'],
+   desc:'Board hidden; revealed for 1s every 5s. Score ×1.5.',
+   apply(){blackoutActive=true;scoreMult*=1.5;startBlackout();}},
+  {id:'blackout_plus',name:'Blackout+',cls:'mod-orange',upgradeOf:'blackout',
+   desc:'Board hidden; revealed for 1s every 10s. Score ×3 total (base ×1.5 stacks with this ×2).',
+   apply(){blackoutActive=true;scoreMult*=2;blackoutDelay=10000;startBlackout();}},
+  {id:'earthquake',name:'Earthquake',cls:'mod-yellow',
+   desc:'Every 10 pieces the board shifts left or right (wrapping). Score ×2.',
+   apply(){earthquakeActive=true;scoreMult*=2;}},
+  {id:'minimalist',name:'Minimalist',cls:'mod-yellow',upgrades:['minimalist_plus'],
+   desc:'Next queue shows only 1 piece. Score ×1.25.',
+   apply(){minimalistActive=true;scoreMult*=1.25;}},
+  {id:'minimalist_plus',name:'Minimalist+',cls:'mod-orange',upgradeOf:'minimalist',
+   desc:'Next queue shows 1 piece in monochromatic grey. Score ×1.5 (replaces base ×1.25).',
+   apply(){minimalistActive=true;minimalistMono=true;scoreMult/=1.25;scoreMult*=1.5;}},
+  {id:'amnesia',name:'Amnesia',cls:'mod-yellow',upgrades:['amnesia_plus'],
+   desc:'Hold slot is hidden but usable. Score ×1.5.',
+   apply(){amnesiaActive=true;scoreMult*=1.5;}},
+  {id:'amnesia_plus',name:'Amnesia+',cls:'mod-orange',upgradeOf:'amnesia',
+   desc:'Hold slot is fully disabled. Score ×2 (replaces base ×1.5).',
+   apply(){amnesiaActive=true;amnesiaPlus=true;scoreMult/=1.5;scoreMult*=2;}},
+  {id:'overdrive',name:'Overdrive',cls:'mod-yellow',staticLevel:true,
+   desc:'+3 levels immediately, but all score gains are halved.',
+   apply(){level+=3;scoreMult*=0.5;}},
+  {id:'thinbag',name:'Thin Bag',cls:'mod-yellow',upgrades:['thinbag_plus'],
+   desc:'One random piece type is removed from the bag each shuffle. Score ×1.5.',
+   apply(){scoreMult*=1.5;thinBagRemove=1;randomiseThinBag();}},
+  {id:'thinbag_plus',name:'Thin Bag+',cls:'mod-orange',upgradeOf:'thinbag',
+   desc:'Three random piece types removed; one random non-O piece added back per shuffle. Score ×2.5 (replaces base ×1.5).',
+   apply(){scoreMult/=1.5;scoreMult*=2.5;thinBagRemove=3;thinBagAddBack=true;randomiseThinBag();}},
+  // Mirror mod — 180° key horizontally flips the piece instead of rotating
+  {id:'mirror',name:'Mirror',cls:'mod-yellow',
+   desc:'The 180° rotation key now flips the piece horizontally instead. Score ×1.5.',
+   apply(){mirrorActive=true;scoreMult*=1.5;}},
+  {id:'frostbag_mini',name:'Frost Bag',cls:'mod-yellow',upgrades:['frostbag'],
+   desc:'One piece per bag has a single random mino replaced with a frost cell. That one cell needs two line clears to remove; the rest of the piece is normal.',
+   apply(){frostBagMiniActive=true;}},
+  {id:'frostbag',name:'Frost Bag+',cls:'mod-orange',upgradeOf:'frostbag_mini',
+   desc:'The entire extra frost piece added per bag is icy. All its cells need two line clears to remove.',
+   apply(){frostBagMiniActive=false;frostBagActive=true;}},
+  {id:'tetraple',name:'Tetraple',cls:'mod-yellow',
+   desc:'Swaps Tetris and Triple behaviour: Triples maintain B2B and score 800pts (like a Tetris); Tetrises break B2B and score 500pts (like a Triple). T-spin triples are unaffected.',
+   apply(){tetrapleActive=true;}},
+  {id:'ttetromino',name:'T-Tetramino',cls:'mod-yellow',
+   desc:'All I-pieces in the bag are replaced with T-pieces — including any already in the current bag. The bag now has up to 3 T\'s per cycle. Score ×1.5 — but good luck clearing Tetrises.',
+   apply(){
+     tTetrominoActive=true;scoreMult*=1.5;
+     // Also convert any I-pieces already sitting in the current bag and next queue
+     bag=bag.map(x=>x==='I'?'T':x);
+     nextPieces=nextPieces.map(x=>x==='I'?'T':x);
+   }},
+  {id:'btbchain',name:'BTB Chain',cls:'mod-yellow',upgrades:['btbchain_plus'],
+   desc:'B2B qualifying clears (Tetris, T-spin, PC) increment a chain stack (cap 25). Tier multipliers: 0–4=×1.25, 5–9=×1.50, 10–14=×1.75, 15–19=×2.00, 20–24=×2.25, 25=×2.50. Breaking the chain resets the stack to 0.',
+   apply(){btbChainActive=true;}},
+  {id:'btbchain_plus',name:'BTB Chain+',cls:'mod-orange',upgradeOf:'btbchain',
+   desc:'BTB Chain upgrade: higher tier multipliers (×1.35, ×1.70, ×2.05, ×2.40, ×2.75, ×3.10 at tier 5). When the chain breaks, one 10-line wound row is added per tier lost.',
+   apply(){btbChainActive=true;btbChainPlus=true;}},
+  {id:'flowmeter',name:'Flow Meter',cls:'mod-yellow',
+   desc:'Tracks a flow meter (−5 to +15 display range). Qualifying clears (Tetris/T-spin/All-spin/PC) give +1 flow; non-qualifying clears (single/double/triple without spin) give −1. When flow exceeds +15, drain 1 and award 500 pts each tick. When flow drops below −5, inject a wound row of value 15.',
+   apply(){flowMeterActive=true;}},
+];
+
+// ── STATE ─────────────────────────────────────────────────────────────────────
+let board,score,level,lines,combo,bToB;
+let hold,holdUsed,bag,nextPieces;
+let cur,curX,curY,curRot,curFlipped;
+let lockTimer,lockMoves;
+let gameRunning,pieceCount,linesToNextLevel,activeMods;
+let pendingModifiers;
+let lastClearType,dejaVuActive,dejaVuPlus;
+let scoreMult,allInActive,permafrostActive,noDASActive,tspinMultActive,allSpinActive;
+let blindfoldedActive,blindfoldedMono;
+let amnesiaActive,amnesiaPlus;
+let blackoutActive,blackoutTimer,blackoutVisible,blackoutDelay;
+let earthquakeActive,minimalistActive,minimalistMono,oSpinMetaActive;
+let thinBagRemove,thinBagAddBack,thinBagExcluded;
+let mirrorActive; // flip mod
+let frostBagMiniActive,frostBagActive,tetrapleActive,tTetrominoActive; // new mods
+let btbChainActive,btbChainPlus,btbChainStack; // BTB Chain mod
+let flowMeterActive,flowMeter; // Flow Meter mod
+let softDropHeld=false,lastRotated=false;
+let eqIndicator=null,hasWon=false,winPending=false;
+
+// ── THIN BAG ──────────────────────────────────────────────────────────────────
+function randomiseThinBag(){
+  const pool=['I','O','T','S','Z','J','L'];
+  thinBagExcluded=[];
+  for(let i=pool.length-1;i>0;i--){const j=~~(Math.random()*(i+1));[pool[i],pool[j]]=[pool[j],pool[i]];}
+  for(let i=0;i<thinBagRemove;i++)thinBagExcluded.push(pool[i]);
+}
+
+// ── CELL HELPERS ──────────────────────────────────────────────────────────────
+function isDejaCell(v){return v&&typeof v==='string'&&v.startsWith('DEJA:');}
+function dejaLinesLeft(v){return isDejaCell(v)?parseInt(v.slice(5)):0;}
+function makeDejaCell(n){return `DEJA:${n}`;}
+function dejaColor(n,maxN){
+  // Stops: 25=purple, 20=blue, 15=green, 10=yellow, 5=red, 1=white
+  const stops=[
+    {v:25, r:160, g:0,   b:255},  // purple
+    {v:20, r:30,  g:100, b:255},  // blue
+    {v:15, r:0,   g:230, b:80 },  // green
+    {v:10, r:255, g:210, b:0  },  // yellow
+    {v:5,  r:255, g:20,  b:20 },  // red
+    {v:1,  r:255, g:255, b:255},  // white
+  ];
+  const cv=Math.max(1,Math.min(maxN,n));
+  let hi=stops[0],lo=stops[stops.length-1];
+  for(let i=0;i<stops.length-1;i++){
+    if(cv<=stops[i].v&&cv>=stops[i+1].v){hi=stops[i];lo=stops[i+1];break;}
+  }
+  const t=hi.v===lo.v?1:(cv-lo.v)/(hi.v-lo.v);
+  return `rgb(${~~(lo.r+(hi.r-lo.r)*t)},${~~(lo.g+(hi.g-lo.g)*t)},${~~(lo.b+(hi.b-lo.b)*t)})`;
+}
+function isFrostCell(v){return v&&typeof v==='string'&&v.startsWith('FROST_')&&!v.startsWith('FROST_CRACKED_');}
+function isFrostCracked(v){return v&&typeof v==='string'&&v.startsWith('FROST_CRACKED_');}
+function frostBaseType(v){
+  if(isFrostCell(v))return v.slice(6);
+  if(isFrostCracked(v))return v.slice(14);
+  return null;
+}
+// FROSTMINO pieces: a normal piece where one random mino index is frost
+// Token format: "FROSTMINO_T_2" = T-piece, mino index 2 is the frost cell
+function isFrostMinoPiece(type){return typeof type==='string'&&type.startsWith('FROSTMINO_');}
+function parseFrostMino(type){
+  // returns {baseType, frostR, frostC} — row,col of the frost cell in canonical (rot-0) shape
+  const parts=type.slice(10).split('_'); // after "FROSTMINO_"
+  return{baseType:parts[0],frostR:parseInt(parts[1]),frostC:parseInt(parts[2])};
+}
+function makeFrostMinoToken(baseType){
+  // Pick a random filled cell by row,col in the canonical shape
+  const shape=PIECES[baseType].shape;
+  const cells=[];
+  shape.forEach((row,r)=>row.forEach((c,col)=>{if(c)cells.push([r,col]);}));
+  const [fr,fc]=cells[~~(Math.random()*cells.length)];
+  return`FROSTMINO_${baseType}_${fr}_${fc}`;
+}
+function cellColor(v){
+  if(!v)return null;
+  if(v==='PERM')return '#444';
+  if(isDejaCell(v)){
+    const n=dejaLinesLeft(v);
+    return dejaColor(n,Math.max(25,n));
+  }
+  if(isFrostCell(v)) return '#b0eeff'; // solid ice blue
+  if(isFrostCracked(v)) return '#5588aa'; // darker cracked ice
+  if(blindfoldedMono)return '#666';
+  return PIECE_COLORS[v]||'#888';
+}
+
+// ── BTB CHAIN HELPERS ─────────────────────────────────────────────────────────
+function btbChainTier(){
+  if(btbChainStack<5)return 0;
+  if(btbChainStack<10)return 1;
+  if(btbChainStack<15)return 2;
+  if(btbChainStack<20)return 3;
+  if(btbChainStack<25)return 4;
+  return 5; // capped at 25
+}
+function btbChainMult(){
+  if(!btbChainActive)return 1;
+  const tier=btbChainTier();
+  // base tiers: ×1.25, ×1.50, ×1.75, ×2.00, ×2.25, ×2.50
+  // plus tiers: ×1.35, ×1.70, ×2.05, ×2.40, ×2.75, ×3.10
+  if(btbChainPlus) return [1.35,1.70,2.05,2.40,2.75,3.10][tier];
+  return [1.25,1.50,1.75,2.00,2.25,2.50][tier];
+}
+// Color for BTB chain display: White(1) → Red(5) → Yellow(10) → Green(15) → Blue(20) → Purple(25)
+function btbChainColor(stack){
+  const stops=[
+    {v:25, r:160, g:0,   b:255},  // purple
+    {v:20, r:30,  g:100, b:255},  // blue
+    {v:15, r:0,   g:230, b:80 },  // green
+    {v:10, r:255, g:210, b:0  },  // yellow
+    {v:5,  r:255, g:20,  b:20 },  // red
+    {v:1,  r:255, g:255, b:255},  // white
+  ];
+  const cv=Math.max(1,Math.min(25,stack));
+  let hi=stops[0],lo=stops[stops.length-1];
+  for(let i=0;i<stops.length-1;i++){
+    if(cv<=stops[i].v&&cv>=stops[i+1].v){hi=stops[i];lo=stops[i+1];break;}
+  }
+  const t=hi.v===lo.v?1:(cv-lo.v)/(hi.v-lo.v);
+  return `rgb(${~~(lo.r+(hi.r-lo.r)*t)},${~~(lo.g+(hi.g-lo.g)*t)},${~~(lo.b+(hi.b-lo.b)*t)})`;
+}
+// Given shape cell (sy,sx) in cur.shape, is it the single frost mino?
+// cur.shape = rotateN(flipH?(canonical), curRot)
+// So: start from canonical (frostMinoR, frostMinoC), apply flip, then apply curRot CW turns.
+function isFrostMinoCell(sy,sx){
+  if(!cur.isFrostMino||cur.frostMinoR<0)return false;
+  const shape0=PIECES[cur.baseType].shape;
+  const N=shape0.length;
+  let r=cur.frostMinoR,c=cur.frostMinoC;
+  // Step 1: flip horizontally if active (mirrors columns within each row)
+  if(curFlipped){c=(shape0[0].length-1)-c;}
+  // Step 2: apply curRot clockwise quarter-turns: (r,c) → (c, N-1-r)
+  for(let i=0;i<curRot;i++){const nr=c,nc=N-1-r;r=nr;c=nc;}
+  return sy===r&&sx===c;
+}
+function addFlowWound(countDown){
+  // Insert a wound row with a specific countdown value, reusing the DEJA cell system
+  let protectedCount=0;
+  for(let r=ROWS-1;r>=0;r--){
+    const v=board[r][0];
+    if(v==='PERM'||isDejaCell(v))protectedCount++;
+    else break;
+  }
+  board.splice(0,1);
+  const insertAt=Math.max(0,(ROWS-1)-protectedCount);
+  board.splice(insertAt,0,Array(COLS).fill(makeDejaCell(countDown)));
+}
+function addPermLines(n){
+  for(let i=0;i<n;i++){board.shift();board.push(Array(COLS).fill('PERM'));}
+}
+
+// Wound row countdown start value (10 normally, 20 with Déjà Vu+)
+function woundStart(){return dejaVuPlus?20:10;}
+
+// Insert wound row just above any perm/deja rows at the bottom.
+// Prevents wound rows from overwriting permanent lines.
+function addDejaRow(){
+  let protectedCount=0;
+  for(let r=ROWS-1;r>=0;r--){
+    const v=board[r][0];
+    if(v==='PERM'||isDejaCell(v))protectedCount++;
+    else break;
+  }
+  board.splice(0,1); // remove top row to make room
+  const insertAt=Math.max(0,(ROWS-1)-protectedCount);
+  board.splice(insertAt,0,Array(COLS).fill(makeDejaCell(woundStart())));
+}
+
+// Tick wound rows: count down by linesCleared.
+// When countdown reaches 0 or below, the wound row is REMOVED entirely.
+// woundCountBefore: how many wound rows existed before any new ones were injected this clear.
+// New wounds (injected this same clear) are immune — they sit above old ones, so we tick bottom-up
+// and only process the first woundCountBefore wound rows we encounter.
+function tickDejaRows(linesCleared,woundCountBefore){
+  const limit = (woundCountBefore===undefined) ? Infinity : woundCountBefore;
+  let ticked=0;
+  for(let r=ROWS-1;r>=0;r--){
+    const cell=board[r][0];
+    if(!isDejaCell(cell))continue;
+    if(ticked>=limit)break; // remaining wound rows are newly injected this clear — leave them
+    ticked++;
+    const left=dejaLinesLeft(cell)-linesCleared;
+    if(left<=0){
+      board.splice(r,1);
+      board.unshift(Array(COLS).fill(null));
+      // r stays same — row above shifted down, re-examine same index
+    } else {
+      board[r]=board[r].map(()=>makeDejaCell(left));
+    }
+  }
+}
+
+// ── BLACKOUT ──────────────────────────────────────────────────────────────────
+function startBlackout(){if(blackoutTimer)clearTimeout(blackoutTimer);blackoutVisible=false;scheduleBlackout();}
+function scheduleBlackout(){
+  if(!blackoutActive)return;
+  blackoutVisible=false;
+  blackoutTimer=setTimeout(()=>{blackoutVisible=true;blackoutTimer=setTimeout(()=>scheduleBlackout(),1000);},blackoutDelay);
+}
+
+// ── ROTATION & FLIP ───────────────────────────────────────────────────────────
+function rotateCW(shape){const N=shape.length,r=Array.from({length:N},()=>Array(N).fill(0));for(let y=0;y<N;y++)for(let x=0;x<N;x++)r[x][N-1-y]=shape[y][x];return r;}
+function rotateN(shape,times){let s=shape;for(let i=0;i<((times%4)+4)%4;i++)s=rotateCW(s);return s;}
+
+// Horizontal flip of a shape matrix
+function flipH(shape){return shape.map(row=>[...row].reverse());}
+
+// The canonical base for the current piece, respecting flip state
+function baseShape(){
+  const bt=cur.baseType||cur.type;
+  const canon=PIECES[bt].shape;
+  return curFlipped?flipH(canon):canon;
+}
+
+// Attempt to place a flipped piece: toggle curFlipped, recompute shape at same curRot
+function tryFlip(){
+  const newFlipped=!curFlipped;
+  const bt=cur.baseType||cur.type;
+  const newBase=newFlipped?flipH(PIECES[bt].shape):PIECES[bt].shape;
+  const ns=rotateN(newBase,curRot);
+  const offsets=[[0,0],[-1,0],[1,0],[-2,0],[2,0],[0,-1],[0,1]];
+  for(const[dx,dy]of offsets){
+    if(canPlace(ns,curX+dx,curY+dy)){
+      curFlipped=newFlipped;cur.shape=ns;curX+=dx;curY+=dy;
+      lastRotated=true;resetLock();return true;
+    }
+  }
+  return false;
+}
+
+function tryKick(ns,nr,kicks){
+  if(canPlace(ns,curX,curY)){applyRot(ns,nr,0,0);return true;}
+  if(kicks)for(const[kx,ky]of kicks)if(canPlace(ns,curX+kx,curY+ky)){applyRot(ns,nr,kx,ky);return true;}
+  return false;
+}
+function tryRotate(dir){
+  const nr=(curRot+dir+4)%4,ns=rotateN(baseShape(),nr);
+  const key=`${curRot}>${nr}`,kicks=(cur.baseType||cur.type)==='I'?KICKS.I[key]:KICKS.JLSTZ[key];
+  const conv=kicks?kicks.map(([kx,ky])=>[kx,-ky]):null;
+  const ok=tryKick(ns,nr,conv);if(ok)lastRotated=true;return ok;
+}
+function tryRotate180(){
+  const nr=(curRot+2)%4,ns=rotateN(baseShape(),nr);
+  const key=`${curRot}>${nr}`,kicks=(cur.baseType||cur.type)==='I'?KICKS180.I[key]:KICKS180.JLSTZ[key];
+  const ok=tryKick(ns,nr,kicks);if(ok)lastRotated=true;return ok;
+}
+function applyRot(s,r,dx,dy){cur.shape=s;curRot=r;curX+=dx;curY+=dy;resetLock();}
+function resetLock(){if(lockTimer!==null){lockMoves++;if(lockMoves<15)lockTimer=0;}}
+function moveLeft(){
+  if(permafrostActive){let nx=curX;while(canPlace(cur.shape,nx-1,curY))nx--;if(nx!==curX){curX=nx;resetLock();lastRotated=false;}}
+  else if(canPlace(cur.shape,curX-1,curY)){curX--;resetLock();lastRotated=false;}
+}
+function moveRight(){
+  if(permafrostActive){let nx=curX;while(canPlace(cur.shape,nx+1,curY))nx++;if(nx!==curX){curX=nx;resetLock();lastRotated=false;}}
+  else if(canPlace(cur.shape,curX+1,curY)){curX++;resetLock();lastRotated=false;}
+}
+function softDrop(){
+  if(canPlace(cur.shape,curX,curY+1)){curY++;if(!allInActive)score+=Math.round(scoreMult);lockTimer=null;}
+  else startLock();
+}
+function hardDrop(){let d=0;while(canPlace(cur.shape,curX,curY+1)){curY++;d++;}if(!allInActive)score+=Math.round(d*2*scoreMult);lock();}
+// Sonic drop: instantly falls to floor but does NOT lock — keeps lock delay alive for sliding
+function sonicDrop(){
+  while(canPlace(cur.shape,curX,curY+1))curY++;
+  // Start lock timer if not already running, but don't lock immediately
+  if(lockTimer===null)lockTimer=0;
+}
+function startLock(){if(lockTimer===null)lockTimer=0;}
+function getGhost(){let gy=curY;while(canPlace(cur.shape,curX,gy+1))gy++;return gy;}
+function isTSpin(){
+  if((cur.baseType||cur.type)!=='T'||!lastRotated)return false;
+  const cx=curX+1,cy=curY+1;let f=0;
+  for(const[x,y]of[[cx-1,cy-1],[cx+1,cy-1],[cx+1,cy+1],[cx-1,cy+1]])
+    if(x<0||x>=COLS||y<0||y>=ROWS||(board[y]&&board[y][x]))f++;
+  return f>=3;
+}
+function isAllSpin(){
+  if(!lastRotated)return false;
+  const corners=[[curX-1,curY-1],[curX+cur.shape[0].length,curY-1],[curX+cur.shape[0].length,curY+cur.shape.length],[curX-1,curY+cur.shape.length]];
+  let f=0;for(const[x,y]of corners)if(x<0||x>=COLS||y<0||y>=ROWS||(board[y]&&board[y][x]))f++;
+  return f>=3;
+}
+
+// ── BAG / SPAWN ───────────────────────────────────────────────────────────────
+function getBag(){
+  let t=['I','O','T','S','Z','J','L'];
+  // T-Tetramino mod: replace I with T in the bag
+  if(tTetrominoActive)t=t.map(x=>x==='I'?'T':x);
+  if(oSpinMetaActive){t.push('O');if(allSpinActive)t.push('O');}
+  if(thinBagRemove>0&&thinBagExcluded&&thinBagExcluded.length){
+    t=t.filter(x=>!thinBagExcluded.includes(x));
+    if(thinBagAddBack)t.push(NON_O_TYPES[~~(Math.random()*NON_O_TYPES.length)]);
+    randomiseThinBag();
+  }
+  // Frost Bag (mini): one random piece in the bag gets one random frost mino
+  if(frostBagMiniActive){
+    const base=['I','O','T','S','Z','J','L'];
+    const bt=base[~~(Math.random()*base.length)];
+    // Replace a random slot in t with a frostmino token for that type
+    const replaceIdx=~~(Math.random()*t.length);
+    t[replaceIdx]=makeFrostMinoToken(bt);
+  }
+  // Frost Bag+ (full piece frost)
+  if(frostBagActive){
+    const base=['I','O','T','S','Z','J','L'];
+    const ft=base[~~(Math.random()*base.length)];
+    t.push('FROST_'+ft);
+  }
+  for(let i=t.length-1;i>0;i--){const j=~~(Math.random()*(i+1));[t[i],t[j]]=[t[j],t[i]];}
+  return t;
+}
+function nextFromBag(){
+  if(bag.length<4)bag=bag.concat(getBag());
+  const t=bag.shift();pieceCount++;
+  if(earthquakeActive&&pieceCount%10===0)doEarthquake();
+  return t;
+}
+function spawnPiece(type,resetHold){
+  const isFrost=typeof type==='string'&&type.startsWith('FROST_')&&!type.startsWith('FROST_CRACKED_');
+  const isFrostMino=isFrostMinoPiece(type);
+  let baseType,frostMinoR=-1,frostMinoC=-1;
+  if(isFrost){baseType=type.slice(6);}
+  else if(isFrostMino){const p=parseFrostMino(type);baseType=p.baseType;frostMinoR=p.frostR;frostMinoC=p.frostC;}
+  else{baseType=type;}
+  cur={type,shape:PIECES[baseType].shape.map(r=>[...r]),isFrost,isFrostMino,frostMinoR,frostMinoC,baseType};
+  curRot=0;curFlipped=false;curX=~~((COLS-cur.shape[0].length)/2);curY=0;
+  lockTimer=null;lockMoves=0;lastRotated=false;
+  if(resetHold)holdUsed=false;
+  if(!canPlace(cur.shape,curX,curY))endGame();
+}
+function doHold(){
+  if(amnesiaPlus||holdUsed)return;
+  holdUsed=true;
+  const prev=hold;hold=cur.type;
+  if(!prev){spawnPiece(nextPieces.shift(),false);nextPieces.push(nextFromBag());}
+  else spawnPiece(prev,false);
+}
+function doEarthquake(){
+  const d=Math.random()<.5?-1:1;
+  eqIndicator={dir:d,alpha:1.0};
+  for(let r=0;r<ROWS;r++){
+    if(d===-1){const f=board[r][0];for(let c=0;c<COLS-1;c++)board[r][c]=board[r][c+1];board[r][COLS-1]=f;}
+    else{const l=board[r][COLS-1];for(let c=COLS-1;c>0;c--)board[r][c]=board[r][c-1];board[r][0]=l;}
+  }
+}
+
+// ── PHYSICS ───────────────────────────────────────────────────────────────────
+function canPlace(shape,ox,oy){
+  for(let y=0;y<shape.length;y++)for(let x=0;x<shape[y].length;x++){
+    if(!shape[y][x])continue;
+    const nx=ox+x,ny=oy+y;
+    if(nx<0||nx>=COLS||ny>=ROWS)return false;
+    if(ny>=0&&board[ny][nx])return false;
+  }
+  return true;
+}
+function isGrounded(){return!canPlace(cur.shape,curX,curY+1);}
+
+// ── LOCK & CLEAR ──────────────────────────────────────────────────────────────
+function lock(){
+  const tspin=isTSpin(),allspin=!tspin&&allSpinActive&&isAllSpin();
+  for(let y=0;y<cur.shape.length;y++)for(let x=0;x<cur.shape[y].length;x++){
+    if(!cur.shape[y][x])continue;
+    const ny=curY+y,nx=curX+x;if(ny<0)continue;
+    let cellVal;
+    if(cur.isFrost){
+      cellVal='FROST_'+cur.baseType;
+    } else if(isFrostMinoCell(y,x)){
+      cellVal='FROST_'+cur.baseType;
+    } else {
+      cellVal=cur.baseType;
+    }
+    board[ny][nx]=cellVal;
+  }
+  clearLines(tspin,allspin);
+  const next=nextPieces.shift();nextPieces.push(nextFromBag());spawnPiece(next,true);
+}
+
+function clearLines(tspin,allspin){
+  let cleared=0;
+  for(let r=ROWS-1;r>=0;r--){
+    const row=board[r];
+    const isFull=row.every(c=>c!==null);
+    const isSpecial=row.some(c=>c==='PERM'||isDejaCell(c));
+    if(isFull&&!isSpecial){
+      // Frost two-clear: intact frost cells crack instead of being cleared
+      const hasFrost=row.some(c=>isFrostCell(c));
+      if(hasFrost){
+        // Crack intact frost cells; everything else (normal/cracked) gets nulled
+        for(let c=0;c<COLS;c++){
+          if(isFrostCell(row[c])){
+            board[r][c]='FROST_CRACKED_'+frostBaseType(row[c]);
+          } else {
+            board[r][c]=null;
+          }
+        }
+        // Row is no longer full (has nulls), count the clear, but don't splice
+        cleared++;r++;
+      } else {
+        board.splice(r,1);board.unshift(Array(COLS).fill(null));cleared++;r++;
+      }
+    }
+  }
+
+  if(cleared===0){combo=-1;updateUI();return;}
+
+  // Perfect clear: no normal cells remain
+  const isPC=board.every(row=>row.every(c=>!c||c==='PERM'||isDejaCell(c)||isFrostCracked(c)));
+  lines+=cleared;
+  linesToNextLevel-=cleared;
+  combo++;
+
+  const names=['','single','double','triple','tetris'];
+  const clearType=tspin?`tspin_${names[Math.min(cleared,4)]}`:names[Math.min(cleared,4)];
+  // Tetraple mod: swap qualifying status for triple vs tetris (t-spin triples unaffected)
+  let qualifying;
+  if(tetrapleActive&&!tspin&&!allspin){
+    if(cleared===3)qualifying=true;
+    else if(cleared===4)qualifying=false;
+    else qualifying=false;
+  } else {
+    qualifying=cleared===4||tspin||allspin;
+  }
+  const isBtB=qualifying&&bToB;
+  const wasChaining=bToB;
+  bToB=qualifying;
+
+  // Snapshot pre-injection wound row countdowns — used to identify which rows are "new" after injection
+  // We store a board-snapshot fingerprint: an array of [countdown, colCount] for each wound row bottom-up
+  // Since injections shift rows, we instead just mark newly-added rows as immune by tagging them.
+  // Simplest: count wound rows before, inject, then only tick the bottom N that existed before.
+  const woundCountBefore=board.reduce((n,row)=>n+(isDejaCell(row[0])?1:0),0);
+
+  // BTB Chain: increment on qualifying, reset on break
+  if(btbChainActive){
+    if(qualifying){
+      btbChainStack=Math.min(25,btbChainStack+1);
+    } else if(wasChaining&&btbChainStack>0){
+      if(btbChainPlus){
+        const tiersLost=btbChainTier();
+        for(let i=0;i<tiersLost;i++)addDejaRow();
+      }
+      btbChainStack=0;
+    }
+  }
+
+  // Déjà Vu: add wound line if same clear type repeated
+  if(dejaVuActive&&lastClearType!==null&&clearType===lastClearType)addDejaRow();
+  lastClearType=clearType;
+
+  // Flow Meter: +1 qualifying, -1 non-qualifying clear
+  if(flowMeterActive){
+    flowMeter+=qualifying?1:-1;
+    while(flowMeter>15){flowMeter--;score+=~~(500*scoreMult);}
+    if(flowMeter<-5){
+      const extra=Math.abs(flowMeter+5);
+      addFlowWound(15+extra);
+      flowMeter=-5;
+    }
+  }
+
+  // Tick wound rows AFTER all injection — newly added wounds are immune this clear
+  const hasWoundRows=board.some(row=>row.some(c=>isDejaCell(c)));
+  if(hasWoundRows)tickDejaRows(cleared,woundCountBefore);
+
+  let BASE={1:100,2:300,3:500,4:800};
+  if(tetrapleActive&&!tspin&&!allspin){BASE={1:100,2:300,3:800,4:500};}
+  const TSPIN={1:200,2:400,3:1600};
+  let pts=tspin?((TSPIN[cleared]||400)*level):(allspin?((TSPIN[cleared]||400)*level):((BASE[cleared]||0)*level));
+  if(tspinMultActive&&(tspin||allspin))pts=~~(pts*1.5);
+  if(allInActive&&!isBtB)pts=0;
+  else if(isBtB){
+    const btbMult=allInActive?3:(btbChainActive?btbChainMult():1.5);
+    pts=~~(pts*btbMult);
+  }
+  if(combo>0&&!allInActive)pts+=50*combo*level;
+  if(isPC)pts+=~~(3000*level*scoreMult);
+  pts=~~(pts*scoreMult);score+=pts;
+
+  let levelsGained=0;
+  while(linesToNextLevel<=0){
+    if(!hasWon&&level>=WIN_LEVEL-1){
+      level=WIN_LEVEL;
+      linesToNextLevel=linesPerLevel(WIN_LEVEL);
+      hasWon=true;winPending=true;
+      levelsGained=0;
+      break;
+    }
+    level++;
+    linesToNextLevel+=linesPerLevel(level);
+    levelsGained++;
+  }
+  pendingModifiers+=levelsGained;
+  updateUI();
+
+  if(winPending&&pendingModifiers===0){
+    winPending=false;
+    document.getElementById('modOverlay').style.display='none';
+    gameRunning=false;
+    if(blackoutTimer)clearTimeout(blackoutTimer);
+    showWinScreen();
+    return;
+  }
+  if(pendingModifiers>0)startGracePeriod();
+}
+
+// ── GRACE + MOD FLOW ──────────────────────────────────────────────────────────
+function showGrace(txt,sub,dur,cb){
+  const el=document.getElementById('graceOverlay');
+  document.getElementById('graceText').textContent=txt;
+  document.getElementById('graceSub').textContent=sub;
+  el.style.display='flex';
+  setTimeout(()=>{el.style.display='none';cb();},dur);
+}
+function startGracePeriod(){
+  gameRunning=false;
+  if(blackoutTimer)clearTimeout(blackoutTimer);
+  showGrace('!','modifier incoming',1000,()=>triggerModifierSelect());
+}
+function afterModGrace(cb){
+  // If blackout is active, reveal the board during the "resuming" grace window
+  if(blackoutActive){if(blackoutTimer)clearTimeout(blackoutTimer);blackoutVisible=true;}
+  showGrace('▶','resuming',1000,cb);
+}
+
+// ── WIN SCREEN ────────────────────────────────────────────────────────────────
+function showWinScreen(){
+  gameRunning=false;if(blackoutTimer)clearTimeout(blackoutTimer);
+  const modsHtml=activeMods.length?activeMods.map(m=>`<div class="modifier-tag ${m.cls}">${m.name}</div>`).join(''):'<span style="color:#555">None</span>';
+  document.getElementById('winScreen').innerHTML=`
+    <h1>🏆 You Win!</h1>
+    <div class="win-stat">${score.toLocaleString()} pts</div>
+    <div style="color:#888">Level ${level} · ${lines} lines</div>
+    <div style="color:#aaa;font-size:13px;margin-top:4px">Active Modifiers:</div>
+    <div class="win-mods">${modsHtml}</div>
+    <div class="win-btns">
+      <button class="btn" onclick="goTitleFromWin()">Title Screen</button>
+      <button class="btn-red" onclick="continueGame()">⚠ Continue</button>
+    </div>
+    <div style="color:#555;font-size:11px;margin-top:4px">Continue adds 3 permanent lines and raises the level</div>
+  `;
+  document.getElementById('winScreen').style.display='flex';
+}
+function continueGame(){
+  document.getElementById('winScreen').style.display='none';
+  addPermLines(3);level++;linesToNextLevel=linesPerLevel(level);pendingModifiers=0;
+  updateUI();gameRunning=true;if(blackoutActive)scheduleBlackout();startLoop();
+}
+function goTitleFromWin(){document.getElementById('winScreen').style.display='none';document.getElementById('gameUI').style.display='none';document.getElementById('titleScreen').style.display='flex';}
+
+// ── MODIFIER SELECT ───────────────────────────────────────────────────────────
+let modPickList=[],modSelIdx=0;
+function triggerModifierSelect(){
+  if(winPending&&pendingModifiers===0){
+    winPending=false;
+    document.getElementById('modOverlay').style.display='none';
+    showWinScreen();return;
+  }
+  const pool=ALL_MODS.filter(m=>{
+    if(m.upgradeOf)return activeMods.find(a=>a.id===m.upgradeOf)&&!activeMods.find(a=>a.id===m.id);
+    const upgraded=ALL_MODS.find(u=>u.upgradeOf===m.id);
+    if(upgraded&&activeMods.find(a=>a.id===upgraded.id))return false;
+    return!activeMods.find(a=>a.id===m.id)&&!(m.id==='bedrock'&&activeMods.length===0);
+  });
+  modPickList=[];const src=[...pool];
+  while(modPickList.length<3&&src.length>0){const i=~~(Math.random()*src.length);modPickList.push(src.splice(i,1)[0]);}
+  modSelIdx=0;renderModCards();document.getElementById('modOverlay').style.display='flex';
+}
+function renderModCards(){
+  const el=document.getElementById('modCards');el.innerHTML='';
+  modPickList.forEach((m,i)=>{
+    const d=document.createElement('div');d.className='mod-card';
+    d.style.borderColor=i===modSelIdx?'#c8f':'#333';
+    d.style.transform=i===modSelIdx?'translateY(-6px)':'';
+    d.style.boxShadow=i===modSelIdx?'0 0 16px #a0f4':'';
+    d.innerHTML=`<h3>${m.name}${m.upgradeOf?` <span style="font-size:11px;color:#f80">UPGRADE</span>`:''}</h3><p>${m.desc}</p>${i===modSelIdx?'<div style="font-size:11px;color:#888;margin-top:8px">[ Hard Drop to confirm ]</div>':''}`;
+    d.onclick=()=>applyMod(m);el.appendChild(d);
+  });
+}
+function applyMod(m){
+  document.getElementById('modOverlay').style.display='none';
+  if(m.upgradeOf)activeMods=activeMods.filter(a=>a.id!==m.upgradeOf);
+  activeMods.push(m);m.apply();
+  pendingModifiers=Math.max(0,pendingModifiers-1);
+  updateModList();updateUI();
+  afterModGrace(()=>{
+    if(winPending&&pendingModifiers===0){winPending=false;showWinScreen();return;}
+    if(pendingModifiers>0)triggerModifierSelect();
+    else{gameRunning=true;if(blackoutActive)scheduleBlackout();startLoop();}
+  });
+}
+function updateModList(){
+  const el=document.getElementById('modList');
+  el.innerHTML=activeMods.length?activeMods.map(m=>`<div class="modifier-tag ${m.cls}">${m.name}</div>`).join(''):'<span style="color:#444;font-size:11px">None</span>';
+}
+
+// ── UI ────────────────────────────────────────────────────────────────────────
+function updateUI(){
+  document.getElementById('scoreLabelEl').textContent='Score';
+  document.getElementById('scoreEl').textContent=score;
+  document.getElementById('levelEl').textContent=level;
+  document.getElementById('linesEl').textContent=lines;
+  document.getElementById('comboEl').textContent=combo>0?combo:0;
+  document.getElementById('nextModEl').textContent=`Next lv: ${Math.max(0,linesToNextLevel)} lines`;
+  const b=document.getElementById('btbEl');
+  const bc=document.getElementById('btbChainEl');
+  if(bToB){
+    b.className='btb-on';
+    if(btbChainActive){
+      const col=btbChainColor(btbChainStack);
+      b.style.color=col;b.style.textShadow=`0 0 8px ${col}88`;
+      bc.style.display='block';
+      const m=btbChainMult().toFixed(2);
+      bc.style.color=col;
+      bc.textContent=`× ${m}  [${btbChainStack}]`;
+    } else {
+      b.style.color='';b.style.textShadow='';
+      bc.style.display='none';
+    }
+    b.textContent='● ACTIVE';
+  } else {
+    b.className='btb-off';b.style.color='';b.style.textShadow='';b.textContent='—';
+    if(btbChainActive&&btbChainStack===0){
+      bc.style.display='block';bc.style.color='#555';bc.textContent='↓  [0]';
+    } else {bc.style.display='none';}
+  }
+  // Flow meter — 20-segment vertical eval bar beside board
+  // Segments 5–19: positive (+1 to +15), top=+15, lit when flowMeter >= segment value
+  // Divider line at zero
+  // Segments 0–4: negative (-5 to -1), lit when flowMeter <= segment value
+  const fside=document.getElementById('flowMeterSide');
+  if(flowMeterActive){
+    fside.style.display='flex';
+    for(let i=0;i<20;i++){
+      const el=document.getElementById('fseg'+i);
+      if(!el)continue;
+      let lit=false;
+      let color,glow;
+      if(i>=5){
+        // Positive zone: segment i represents flow value (i-4), i.e. fseg5=+1, fseg19=+15
+        const val=i-4; // +1 to +15
+        lit=flowMeter>=val;
+        if(val>=14){color='#ff0';glow='#ff08';} // top 2 overflow warning = yellow
+        else if(val>=10){color='#0ff';glow='#0ff6';}
+        else if(val>=5){color='#0f8';glow='#0f84';}
+        else{color='#0c0';glow='#0c03';}
+      } else {
+        // Negative zone: segment i represents flow value (i-5), i.e. fseg4=-1, fseg0=-5
+        const val=i-5; // -5 to -1
+        lit=flowMeter<=val;
+        color='#e44';glow='#e443';
+      }
+      if(lit){
+        el.style.background=color;
+        el.style.boxShadow=`0 0 4px ${glow}`;
+        el.style.borderColor=color;
+      } else {
+        el.style.background='#111';
+        el.style.boxShadow='none';
+        el.style.borderColor='#1a1a1a';
+      }
+    }
+  } else {
+    fside.style.display='none';
+  }
+}
+function drawCell(color,x,y,c2,alpha,label,cracked){
+  alpha=alpha||1;c2.globalAlpha=alpha;c2.fillStyle=color;
+  c2.fillRect(x*CELL+1,y*CELL+1,CELL-2,CELL-2);
+  c2.fillStyle='rgba(255,255,255,0.12)';c2.fillRect(x*CELL+2,y*CELL+2,CELL-4,5);
+  // Draw crack lines for cracked frost cells
+  if(cracked){
+    c2.globalAlpha=alpha*0.7;c2.strokeStyle='#223344';c2.lineWidth=1.5;
+    const bx=x*CELL,by=y*CELL,cx=bx+CELL/2,cy=by+CELL/2;
+    c2.beginPath();c2.moveTo(cx,by+4);c2.lineTo(cx-4,cy);c2.lineTo(cx+3,cy+5);c2.lineTo(cx,by+CELL-4);c2.stroke();
+    c2.beginPath();c2.moveTo(cx-4,cy);c2.lineTo(bx+4,cy+4);c2.stroke();
+    c2.beginPath();c2.moveTo(cx+3,cy+5);c2.lineTo(bx+CELL-4,cy+2);c2.stroke();
+    c2.lineWidth=1;
+  }
+  if(label!=null){
+    c2.globalAlpha=1;c2.fillStyle='rgba(0,0,0,0.55)';
+    c2.fillRect(x*CELL+5,y*CELL+5,CELL-10,CELL-10);
+    c2.fillStyle='#fff';c2.font=`bold ${CELL-14}px monospace`;
+    c2.textAlign='center';c2.textBaseline='middle';
+    c2.fillText(String(label),x*CELL+CELL/2,y*CELL+CELL/2+1);
+  }
+  c2.globalAlpha=1;
+}
+function draw(){
+  ctx.clearRect(0,0,300,600);
+  ctx.strokeStyle='#1a1a2e';ctx.lineWidth=.5;
+  for(let x=0;x<=COLS;x++){ctx.beginPath();ctx.moveTo(x*CELL,0);ctx.lineTo(x*CELL,ROWS*CELL);ctx.stroke();}
+  for(let y=0;y<=ROWS;y++){ctx.beginPath();ctx.moveTo(0,y*CELL);ctx.lineTo(COLS*CELL,y*CELL);ctx.stroke();}
+  const showBoard=!blackoutActive||blackoutVisible;
+  for(let r=0;r<ROWS;r++){
+    for(let c=0;c<COLS;c++){
+      const v=board[r][c];if(!v)continue;
+      const isPerm=v==='PERM',isDeja=isDejaCell(v),isCracked=isFrostCracked(v);
+      if(!showBoard&&!isPerm&&!isDeja&&!isCracked)continue;
+      const label=isDeja&&c===0?dejaLinesLeft(v):null;
+      drawCell(cellColor(v),c,r,ctx,1,label,isCracked);
+    }
+  }
+  if(!blindfoldedActive){
+    const gy=getGhost();
+    if(gy!==curY){
+      for(let y=0;y<cur.shape.length;y++)for(let x=0;x<cur.shape[y].length;x++){
+        if(!cur.shape[y][x])continue;
+        const isFM=isFrostMinoCell(y,x);
+        ctx.globalAlpha=.3;
+        ctx.fillStyle=(cur.isFrost||isFM)?'#b0eeff':(blindfoldedMono?'#888':PIECE_COLORS[cur.baseType]);
+        ctx.fillRect((curX+x)*CELL+1,(gy+y)*CELL+1,CELL-2,CELL-2);ctx.globalAlpha=1;
+      }
+    }
+  }
+  for(let y=0;y<cur.shape.length;y++)for(let x=0;x<cur.shape[y].length;x++){
+    if(!cur.shape[y][x])continue;
+    const isFM=isFrostMinoCell(y,x);
+    const col=cur.isFrost?'#b0eeff':isFM?'#b0eeff':(blindfoldedMono?'#888':PIECE_COLORS[cur.baseType]);
+    drawCell(col,curX+x,curY+y,ctx);
+  }
+  // Mirror mod indicator: show a small "⟺" hint near the top when active
+  if(mirrorActive){
+    ctx.globalAlpha=0.35;ctx.fillStyle='#c8f';
+    ctx.font='bold 11px Segoe UI';ctx.textAlign='right';ctx.textBaseline='top';
+    ctx.fillText('⟺ MIRROR',298,4);ctx.globalAlpha=1;
+  }
+  if(eqIndicator){
+    eqIndicator.alpha-=.012;
+    if(eqIndicator.alpha<=0)eqIndicator=null;
+    else{
+      ctx.globalAlpha=eqIndicator.alpha;ctx.fillStyle='#f80';
+      ctx.font='bold 20px Segoe UI';ctx.textAlign='center';ctx.textBaseline='middle';
+      ctx.fillText(eqIndicator.dir===-1?'◀ LEFT':'RIGHT ▶',150,30);ctx.globalAlpha=1;
+    }
+  }
+  drawHold();drawNext();updateUI();
+}
+function drawHold(){
+  hctx.clearRect(0,0,100,80);
+  if(amnesiaPlus){
+    hctx.fillStyle='#1a0a00';hctx.fillRect(0,0,100,80);
+    hctx.fillStyle='#f80';hctx.font='11px Segoe UI';hctx.textAlign='center';hctx.textBaseline='alphabetic';
+    hctx.fillText('DISABLED',50,40);hctx.fillText('×2 score',50,56);
+  } else if(amnesiaActive){
+    const canH=!holdUsed;
+    hctx.fillStyle=canH?'#1a1600':'#181818';hctx.fillRect(10,10,80,60);
+    hctx.fillStyle=canH?'#cc0':'#555';
+    hctx.font='bold 14px Segoe UI';hctx.textAlign='center';hctx.textBaseline='middle';
+    hctx.fillText(hold?'???':'—',50,40);
+  } else if(hold){
+    const isFrostH=typeof hold==='string'&&hold.startsWith('FROST_')&&!hold.startsWith('FROST_CRACKED_');
+    const isFrostMinoH=isFrostMinoPiece(hold);
+    let baseH,frostRH=-1,frostCH=-1;
+    if(isFrostH){baseH=hold.slice(6);}
+    else if(isFrostMinoH){const p=parseFrostMino(hold);baseH=p.baseType;frostRH=p.frostR;frostCH=p.frostC;}
+    else{baseH=hold;}
+    const sh=PIECES[baseH].shape,cs=20,cols=sh[0].length,rows=sh.length;
+    const ox=~~((100-cols*cs)/2),oy=~~((80-rows*cs)/2);
+    for(let y=0;y<rows;y++)for(let x=0;x<cols;x++){
+      if(!sh[y][x])continue;
+      const isFM=isFrostMinoH&&y===frostRH&&x===frostCH;
+      hctx.fillStyle=holdUsed?'#444':(isFrostH||isFM)?'#b0eeff':PIECE_COLORS[baseH];
+      hctx.fillRect(ox+x*cs+1,oy+y*cs+1,cs-2,cs-2);
+      if(!holdUsed){hctx.fillStyle='rgba(255,255,255,0.15)';hctx.fillRect(ox+x*cs+2,oy+y*cs+2,cs-4,5);}
+    }
+  }
+}
+function drawNext(){
+  nctx.clearRect(0,0,160,300);
+  const n=minimalistActive?1:3;
+  for(let i=0;i<n;i++){
+    const t=nextPieces[i];if(!t)continue;
+    const isFrost=typeof t==='string'&&t.startsWith('FROST_')&&!t.startsWith('FROST_CRACKED_');
+    const isFrostMino=isFrostMinoPiece(t);
+    let baseT,frostRT=-1,frostCT=-1;
+    if(isFrost){baseT=t.slice(6);}
+    else if(isFrostMino){const p=parseFrostMino(t);baseT=p.baseType;frostRT=p.frostR;frostCT=p.frostC;}
+    else{baseT=t;}
+    const sh=PIECES[baseT].shape,cs=18,cols=sh[0].length,rows=sh.length;
+    const ox=~~((160-cols*cs)/2),oy=10+i*96+~~((80-rows*cs)/2);
+    for(let y=0;y<rows;y++)for(let x=0;x<cols;x++){
+      if(!sh[y][x])continue;
+      const isFM=isFrostMino&&y===frostRT&&x===frostCT;
+      nctx.fillStyle=minimalistMono?'#666':(isFrost||isFM)?'#b0eeff':PIECE_COLORS[baseT];
+      nctx.fillRect(ox+x*cs+1,oy+y*cs+1,cs-2,cs-2);
+    }
+  }
+}
+
+// ── GAME LOOP ─────────────────────────────────────────────────────────────────
+// Gravity: lv1=1000ms → lv20=50ms linear, lv20→30 quadratic to 0 (20G)
+function getFallSpeed(){
+  if(level>=30)return 0;
+  if(level<=1)return 1000;
+  if(level<=20)return Math.round(1000-(level-1)*50);
+  const t=(level-20)/10;
+  return Math.round(50*Math.pow(1-t,2));
+}
+// Lock delay: flat 500ms lv1-30, then -40ms/lv, floor 50ms
+function getLockDelay(){
+  if(level<=30)return 500;
+  return Math.max(50,500-(level-30)*40);
+}
+let lastTime=0,elapsed=0,softElapsed=0;
+const SOFT_SPEED=50;
+function tick(ts){
+  if(!gameRunning)return;
+  const dt=Math.min(ts-lastTime,200);lastTime=ts;elapsed+=dt;
+  if(softDropHeld){softElapsed+=dt;while(softElapsed>=SOFT_SPEED){softElapsed-=SOFT_SPEED;softDrop();}}else softElapsed=0;
+  const fs=getFallSpeed();
+  if(fs===0){while(canPlace(cur.shape,curX,curY+1))curY++;}
+  else if(elapsed>=fs){elapsed=0;if(canPlace(cur.shape,curX,curY+1))curY++;}
+  if(isGrounded()){if(lockTimer===null)lockTimer=0;else{lockTimer+=dt;if(lockTimer>getLockDelay()){lockTimer=null;lock();}}}
+  else lockTimer=null;
+  draw();requestAnimationFrame(tick);
+}
+function startLoop(){lastTime=performance.now();requestAnimationFrame(tick);}
+
+// ── START / END ───────────────────────────────────────────────────────────────
+function endGame(){
+  gameRunning=false;if(blackoutTimer)clearTimeout(blackoutTimer);
+  const modsHtml=activeMods.length
+    ?activeMods.map(m=>`<div class="modifier-tag ${m.cls}">${m.name}</div>`).join('')
+    :'<span style="color:#555;font-size:11px">None</span>';
+  document.getElementById('overlay').innerHTML=`
+    <div style="display:flex;flex-direction:column;align-items:center;gap:12px;max-width:400px;text-align:center;padding:0 20px">
+      <h1 style="color:#e44;font-size:32px">Game Over</h1>
+      <div style="font-size:28px;font-weight:bold">${score.toLocaleString()} pts</div>
+      <div style="color:#888">Level ${level} · ${lines} lines</div>
+      <div style="color:#666;font-size:11px;text-transform:uppercase;letter-spacing:1px;margin-top:2px">Active Modifiers</div>
+      <div class="go-mods">${modsHtml}</div>
+      <div style="display:flex;gap:10px;margin-top:4px">
+        <button class="btn" onclick="goTitle()">Title Screen</button>
+        <button class="btn" onclick="startGame()">Play Again</button>
+      </div>
+    </div>`;
+  document.getElementById('overlay').style.display='flex';
+}
+function goTitle(){document.getElementById('overlay').style.display='none';document.getElementById('gameUI').style.display='none';document.getElementById('titleScreen').style.display='flex';}
+function startGame(){
+  document.getElementById('overlay').style.display='none';
+  document.getElementById('winScreen').style.display='none';
+  document.getElementById('titleScreen').style.display='none';
+  document.getElementById('aboutScreen').style.display='none';
+  document.getElementById('keybindScreen').style.display='none';
+  document.getElementById('graceOverlay').style.display='none';
+  document.getElementById('modOverlay').style.display='none';
+  document.getElementById('gameUI').style.display='flex';
+  board=Array.from({length:ROWS},()=>Array(COLS).fill(null));
+  score=0;level=1;lines=0;combo=-1;bToB=false;hasWon=false;winPending=false;
+  hold=null;holdUsed=false;pieceCount=0;activeMods=[];pendingModifiers=0;
+  linesToNextLevel=linesPerLevel(1);
+  lastClearType=null;dejaVuActive=false;dejaVuPlus=false;lastRotated=false;eqIndicator=null;
+  scoreMult=1;allInActive=false;permafrostActive=false;noDASActive=false;tspinMultActive=false;allSpinActive=false;
+  blindfoldedActive=false;blindfoldedMono=false;
+  amnesiaActive=false;amnesiaPlus=false;
+  blackoutActive=false;blackoutDelay=5000;earthquakeActive=false;
+  minimalistActive=false;minimalistMono=false;oSpinMetaActive=false;
+  thinBagRemove=0;thinBagAddBack=false;thinBagExcluded=[];
+  mirrorActive=false;frostBagMiniActive=false;frostBagActive=false;tetrapleActive=false;tTetrominoActive=false;
+  btbChainActive=false;btbChainPlus=false;btbChainStack=0;
+  flowMeterActive=false;flowMeter=0;
+  cheatBuffer='';
+  softDropHeld=false;
+  if(blackoutTimer)clearTimeout(blackoutTimer);blackoutTimer=null;blackoutVisible=false;
+  bag=getBag().concat(getBag());
+  nextPieces=[bag.shift(),bag.shift(),bag.shift()];
+  spawnPiece(bag.shift(),true);
+  updateModList();updateUI();
+  gameRunning=true;
+  startLoop();
+}
+
+// ── INPUT ─────────────────────────────────────────────────────────────────────
+let dasTimer=null,arrTimer=null,dasDir=0;
+function startDAS(dir){if(noDASActive)return;dasDir=dir;if(dasTimer)clearTimeout(dasTimer);if(arrTimer)clearInterval(arrTimer);dasTimer=setTimeout(()=>{arrTimer=setInterval(()=>{if(dasDir===-1)moveLeft();else moveRight();},50);},170);}
+document.addEventListener('keydown',e=>{
+  if(listeningFor!==null){
+    if(e.code==='Escape'){const b=document.getElementById(`kbb_${listeningFor}`);if(b){b.classList.remove('listening');b.textContent=fmtKey(editBinds[listeningFor]);}listeningFor=null;return;}
+    e.preventDefault();
+    for(const[act,code]of Object.entries(editBinds))if(code===e.code&&act!==listeningFor){editBinds[act]=editBinds[listeningFor];const ob=document.getElementById(`kbb_${act}`);if(ob)ob.textContent=fmtKey(editBinds[act]);}
+    editBinds[listeningFor]=e.code;const b=document.getElementById(`kbb_${listeningFor}`);if(b){b.classList.remove('listening');b.textContent=fmtKey(e.code);}listeningFor=null;return;
+  }
+  if(document.getElementById('keybindScreen').style.display==='flex')return;
+  if(document.getElementById('aboutScreen').style.display==='flex'){if(e.code==='Escape')hideAbout();return;}
+  if(document.getElementById('modOverlay').style.display==='flex'){
+    if(e.code===binds.moveLeft){modSelIdx=(modSelIdx-1+modPickList.length)%modPickList.length;renderModCards();}
+    else if(e.code===binds.moveRight){modSelIdx=(modSelIdx+1)%modPickList.length;renderModCards();}
+    else if(e.code===binds.hardDrop)applyMod(modPickList[modSelIdx]);
+    return;
+  }
+  if(!gameRunning||e.repeat)return;
+  const c=e.code;
+  if([binds.moveLeft,binds.moveRight,binds.softDrop,binds.hardDrop].includes(c))e.preventDefault();
+  if(c===binds.moveLeft){moveLeft();startDAS(-1);}
+  else if(c===binds.moveRight){moveRight();startDAS(1);}
+  else if(c===binds.softDrop)softDropHeld=true;
+  else if(c===binds.hardDrop)hardDrop();
+  else if(c===binds.rotateCW)tryRotate(1);
+  else if(c===binds.rotateCCW)tryRotate(-1);
+  else if(c===binds.rotate180){
+    // Mirror mod replaces 180° with a horizontal flip
+    if(mirrorActive)tryFlip();
+    else tryRotate180();
+  }
+  else if(c===binds.hold)doHold();
+  else if(binds.sonicDrop&&c===binds.sonicDrop){e.preventDefault();sonicDrop();}
+});
+document.addEventListener('keyup',e=>{
+  if(e.code===binds.softDrop)softDropHeld=false;
+  if((e.code===binds.moveLeft&&dasDir===-1)||(e.code===binds.moveRight&&dasDir===1)){if(dasTimer)clearTimeout(dasTimer);if(arrTimer)clearInterval(arrTimer);dasDir=0;}
+});
+</script>
+</body>
+</html>
